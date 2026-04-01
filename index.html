@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LearnInvestments — Portfolio Simulator</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-content">
+            <h1 class="logo">LearnInvestments</h1>
+            <nav class="tab-nav" role="tablist" aria-label="Main navigation">
+                <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-portfolio" data-tab="portfolio">Portfolio</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-simulate" data-tab="simulate">Simulate</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-learn" data-tab="learn">Learn</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-quiz" data-tab="quiz">Quiz</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <!-- ========== PORTFOLIO BUILDER ========== -->
+        <section id="tab-portfolio" class="tab-panel active" role="tabpanel" aria-labelledby="tab-portfolio">
+            <div class="section-header">
+                <h2>Build Your Portfolio</h2>
+                <p class="section-desc">Allocate your virtual $10,000 across different investment types. Watch how your choices affect risk and potential returns.</p>
+            </div>
+
+            <div class="budget-bar-container">
+                <div class="budget-info">
+                    <span class="budget-label">Budget</span>
+                    <span class="budget-numbers">
+                        <span id="budget-allocated">$0</span> of <span id="budget-total">$10,000</span> allocated
+                    </span>
+                </div>
+                <div class="budget-bar">
+                    <div class="budget-bar-fill" id="budget-bar-fill" style="width: 0%"></div>
+                </div>
+                <div class="budget-remaining" id="budget-remaining">$10,000 remaining</div>
+            </div>
+
+            <div class="portfolio-layout">
+                <div class="allocation-cards" id="allocation-cards">
+                    <!-- Cards rendered by portfolio.js -->
+                </div>
+
+                <aside class="summary-panel" id="summary-panel">
+                    <div class="summary-card">
+                        <h3>Portfolio Summary</h3>
+
+                        <div class="summary-item">
+                            <div class="summary-label">Diversification Score</div>
+                            <div class="score-display">
+                                <span class="score-value" id="diversification-score">0</span>
+                                <span class="score-max">/ 100</span>
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-bar-fill" id="diversification-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="summary-item">
+                            <div class="summary-label">Risk Level</div>
+                            <div class="risk-gauge" id="risk-gauge">
+                                <div class="risk-level" id="risk-level">—</div>
+                                <div class="risk-dots">
+                                    <span class="risk-dot" data-level="1"></span>
+                                    <span class="risk-dot" data-level="2"></span>
+                                    <span class="risk-dot" data-level="3"></span>
+                                    <span class="risk-dot" data-level="4"></span>
+                                    <span class="risk-dot" data-level="5"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="summary-item">
+                            <div class="summary-label">Expected Annual Return</div>
+                            <div class="return-range" id="return-range">—</div>
+                        </div>
+
+                        <div class="allocation-chart-container">
+                            <canvas id="allocation-pie" width="200" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="advice-panel" id="advice-panel">
+                        <h3>Advice</h3>
+                        <div class="advice-list" id="advice-list">
+                            <p class="advice-empty">Start allocating your budget to receive personalized advice.</p>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <!-- ========== SIMULATION ========== -->
+        <section id="tab-simulate" class="tab-panel" role="tabpanel" aria-labelledby="tab-simulate">
+            <div class="section-header">
+                <h2>Simulate Your Portfolio</h2>
+                <p class="section-desc">See how your portfolio might perform over time based on historical patterns. Remember, past performance doesn't guarantee future results.</p>
+            </div>
+
+            <div class="sim-controls">
+                <div class="sim-slider-group">
+                    <label for="sim-years">Time Horizon</label>
+                    <div class="sim-slider-row">
+                        <input type="range" id="sim-years" min="1" max="30" value="15" class="sim-slider" aria-label="Simulation years">
+                        <span class="sim-years-display" id="sim-years-display">15 years</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary sim-run-btn" id="sim-run-btn">Run Simulation</button>
+            </div>
+
+            <div class="sim-chart-container">
+                <canvas id="sim-chart"></canvas>
+                <div class="sim-no-data" id="sim-no-data">
+                    <p>Allocate funds in the <strong>Portfolio</strong> tab, then run a simulation to see projected growth.</p>
+                </div>
+            </div>
+
+            <div class="sim-results" id="sim-results" style="display: none;">
+                <div class="sim-results-grid">
+                    <div class="result-card">
+                        <div class="result-label">Final Value (Median)</div>
+                        <div class="result-value" id="result-median">—</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-label">Likely Range</div>
+                        <div class="result-value" id="result-range">—</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-label">Total Return</div>
+                        <div class="result-value" id="result-return">—</div>
+                    </div>
+                </div>
+
+                <div class="market-events-log">
+                    <h3>Market Events</h3>
+                    <div class="events-list" id="events-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== LEARN ========== -->
+        <section id="tab-learn" class="tab-panel" role="tabpanel" aria-labelledby="tab-learn">
+            <div class="section-header">
+                <h2>Learn About Investing</h2>
+                <p class="section-desc">Explore each investment type, browse the glossary, and pick up tips to start your investing journey with confidence.</p>
+            </div>
+
+            <div class="learn-tabs">
+                <button class="learn-tab-btn active" data-learn-tab="types">Investment Types</button>
+                <button class="learn-tab-btn" data-learn-tab="glossary">Glossary</button>
+                <button class="learn-tab-btn" data-learn-tab="tips">Tips & Mistakes</button>
+            </div>
+
+            <div class="learn-content">
+                <div class="learn-panel active" id="learn-types">
+                    <div class="accordion" id="investment-accordion">
+                        <!-- Rendered by education.js -->
+                    </div>
+                </div>
+
+                <div class="learn-panel" id="learn-glossary">
+                    <div class="glossary-search">
+                        <input type="text" id="glossary-search-input" placeholder="Search terms..." aria-label="Search glossary">
+                    </div>
+                    <div class="glossary-list" id="glossary-list">
+                        <!-- Rendered by education.js -->
+                    </div>
+                </div>
+
+                <div class="learn-panel" id="learn-tips">
+                    <div class="tips-list" id="tips-list">
+                        <!-- Rendered by education.js -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== QUIZ ========== -->
+        <section id="tab-quiz" class="tab-panel" role="tabpanel" aria-labelledby="tab-quiz">
+            <div class="section-header">
+                <h2>Risk Tolerance Quiz</h2>
+                <p class="section-desc">Answer a few questions to discover your investor profile and get a suggested portfolio allocation.</p>
+            </div>
+
+            <div class="quiz-container" id="quiz-container">
+                <div class="quiz-progress">
+                    <div class="quiz-progress-bar">
+                        <div class="quiz-progress-fill" id="quiz-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <span class="quiz-progress-text" id="quiz-progress-text">Question 1 of 10</span>
+                </div>
+
+                <div class="quiz-question-area" id="quiz-question-area">
+                    <!-- Rendered by quiz.js -->
+                </div>
+
+                <div class="quiz-nav">
+                    <button class="btn btn-secondary" id="quiz-prev-btn" disabled>Back</button>
+                    <button class="btn btn-primary" id="quiz-next-btn" disabled>Next</button>
+                </div>
+            </div>
+
+            <div class="quiz-results" id="quiz-results" style="display: none;">
+                <div class="quiz-profile-card" id="quiz-profile-card">
+                    <!-- Rendered by quiz.js -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <p>This is an educational simulator only. It does not constitute financial advice. Past performance does not guarantee future results.</p>
+    </footer>
+
+    <!-- Glossary Popover (shared, positioned by JS) -->
+    <div class="glossary-popover" id="glossary-popover" style="display: none;">
+        <div class="popover-term" id="popover-term"></div>
+        <div class="popover-definition" id="popover-definition"></div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/portfolio.js"></script>
+    <script src="js/simulation.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/education.js"></script>
+</body>
+</html>
