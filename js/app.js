@@ -2,9 +2,12 @@
 window.App = (function () {
     "use strict";
 
-    const state = {
+    var state = {
         currentTab: "portfolio",
-        allocations: { stocks: 0, bonds: 0, etfs: 0, savings: 0 }
+        /* Stock holdings: { AAPL: 3, MSFT: 1, ... } (share counts) */
+        stockHoldings: {},
+        /* Other investments: dollar amounts */
+        otherHoldings: { bonds: 0, etfs: 0, savings: 0 }
     };
 
     /* --- Utility functions --- */
@@ -32,10 +35,40 @@ window.App = (function () {
         return (parent || document).querySelectorAll(selector);
     }
 
+    /* --- Calculate total spent --- */
+    function getTotalSpent() {
+        var data = window.AppData;
+        var total = 0;
+
+        // Stock holdings
+        for (var ticker in state.stockHoldings) {
+            var stock = getStockByTicker(ticker);
+            if (stock) total += state.stockHoldings[ticker] * stock.price;
+        }
+
+        // Other holdings
+        for (var key in state.otherHoldings) {
+            total += state.otherHoldings[key];
+        }
+
+        return total;
+    }
+
+    function getRemaining() {
+        return window.AppData.BUDGET - getTotalSpent();
+    }
+
+    function getStockByTicker(ticker) {
+        var stocks = window.AppData.stocks;
+        for (var i = 0; i < stocks.length; i++) {
+            if (stocks[i].ticker === ticker) return stocks[i];
+        }
+        return null;
+    }
+
     /* --- Tab Navigation --- */
     function initTabs() {
-        const tabBtns = qsa(".tab-btn");
-        tabBtns.forEach(function (btn) {
+        qsa(".tab-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 switchTab(btn.dataset.tab);
             });
@@ -46,7 +79,7 @@ window.App = (function () {
         state.currentTab = tabName;
 
         qsa(".tab-btn").forEach(function (btn) {
-            const isActive = btn.dataset.tab === tabName;
+            var isActive = btn.dataset.tab === tabName;
             btn.classList.toggle("active", isActive);
             btn.setAttribute("aria-selected", isActive);
         });
@@ -76,9 +109,9 @@ window.App = (function () {
         initTabs();
         initLearnTabs();
 
+        if (window.ChartManager) ChartManager.init();
         if (window.Portfolio) Portfolio.init();
         if (window.Simulation) Simulation.init();
-        if (window.ChartManager) ChartManager.init();
         if (window.Quiz) Quiz.init();
         if (window.Education) Education.init();
     }
@@ -93,6 +126,9 @@ window.App = (function () {
         el: el,
         qs: qs,
         qsa: qsa,
-        switchTab: switchTab
+        switchTab: switchTab,
+        getTotalSpent: getTotalSpent,
+        getRemaining: getRemaining,
+        getStockByTicker: getStockByTicker
     };
 })();

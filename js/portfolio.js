@@ -4,152 +4,391 @@ window.Portfolio = (function () {
 
     var data = window.AppData;
     var app;
+    var activeSectorFilter = "all";
 
     function init() {
         app = window.App;
-        renderCards();
+        renderSectorFilters();
+        renderStockGrid();
+        renderOtherInvestments();
+        updateSummary();
+        initModal();
+    }
+
+    /* --- Sector filter buttons --- */
+    function renderSectorFilters() {
+        var sectors = [];
+        data.stocks.forEach(function (s) {
+            if (sectors.indexOf(s.sector) === -1) sectors.push(s.sector);
+        });
+
+        var container = app.el("sector-filters");
+        container.innerHTML = '<button class="filter-btn active" data-sector="all">All</button>';
+
+        sectors.forEach(function (sector) {
+            var btn = document.createElement("button");
+            btn.className = "filter-btn";
+            btn.dataset.sector = sector;
+            btn.textContent = sector;
+            container.appendChild(btn);
+        });
+
+        container.addEventListener("click", function (e) {
+            if (!e.target.classList.contains("filter-btn")) return;
+            activeSectorFilter = e.target.dataset.sector;
+            container.querySelectorAll(".filter-btn").forEach(function (b) {
+                b.classList.toggle("active", b.dataset.sector === activeSectorFilter);
+            });
+            renderStockGrid();
+        });
+    }
+
+    /* --- Stock cards grid --- */
+    function renderStockGrid() {
+        var container = app.el("stock-grid");
+        var filtered = data.stocks.filter(function (s) {
+            return activeSectorFilter === "all" || s.sector === activeSectorFilter;
+        });
+
+        container.innerHTML = filtered.map(function (stock) {
+            var held = app.state.stockHoldings[stock.ticker] || 0;
+            var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
+            var maxBuyable = Math.floor(app.getRemaining() / stock.price) + held;
+
+            return '<div class="stock-card" data-ticker="' + stock.ticker + '" style="border-top-color:' + stock.sectorColor + '">' +
+                '<div class="stock-card-top">' +
+                    '<div class="stock-card-header">' +
+                        '<div class="stock-ticker">' + stock.ticker + '</div>' +
+                        '<div class="stock-name">' + stock.name + '</div>' +
+                    '</div>' +
+                    '<div class="stock-price">' + app.formatCurrency(stock.price) + '<span class="price-label">/share</span></div>' +
+                '</div>' +
+                '<div class="stock-card-meta">' +
+                    '<span class="meta-tag">' + stock.sector + '</span>' +
+                    '<span class="meta-tag">Risk: ' + riskLabels[stock.riskLevel] + '</span>' +
+                    (stock.dividend > 0 ? '<span class="meta-tag dividend-tag">Div: ' + stock.dividend + '%</span>' : '') +
+                '</div>' +
+                '<p class="stock-card-desc">' + stock.description.split(".")[0] + '.</p>' +
+                '<div class="stock-card-actions">' +
+                    '<button class="btn btn-secondary btn-sm stock-info-btn" data-ticker="' + stock.ticker + '">Learn More</button>' +
+                    '<div class="share-controls">' +
+                        '<button class="share-btn minus" data-ticker="' + stock.ticker + '" ' + (held === 0 ? 'disabled' : '') + '>&minus;</button>' +
+                        '<span class="share-count" id="count-' + stock.ticker + '">' + held + '</span>' +
+                        '<button class="share-btn plus" data-ticker="' + stock.ticker + '" ' + (app.getRemaining() < stock.price && held === 0 ? 'disabled' : '') + '>+</button>' +
+                    '</div>' +
+                '</div>' +
+                (held > 0 ? '<div class="stock-held-value">Invested: ' + app.formatCurrency(held * stock.price) + '</div>' : '') +
+            '</div>';
+        }).join("");
+
+        // Bind events
+        container.querySelectorAll(".share-btn.plus").forEach(function (btn) {
+            btn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                buyShare(btn.dataset.ticker);
+            });
+        });
+        container.querySelectorAll(".share-btn.minus").forEach(function (btn) {
+            btn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                sellShare(btn.dataset.ticker);
+            });
+        });
+        container.querySelectorAll(".stock-info-btn").forEach(function (btn) {
+            btn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                showStockModal(btn.dataset.ticker);
+            });
+        });
+    }
+
+    /* --- Buy / Sell shares --- */
+    function buyShare(ticker) {
+        var stock = app.getStockByTicker(ticker);
+        if (!stock || app.getRemaining() < stock.price) return;
+
+        app.state.stockHoldings[ticker] = (app.state.stockHoldings[ticker] || 0) + 1;
+        renderStockGrid();
         updateSummary();
     }
 
-    /* --- Render allocation cards --- */
-    function renderCards() {
-        var container = app.el("allocation-cards");
+    function sellShare(ticker) {
+        if (!app.state.stockHoldings[ticker] || app.state.stockHoldings[ticker] <= 0) return;
+
+        app.state.stockHoldings[ticker]--;
+        if (app.state.stockHoldings[ticker] === 0) delete app.state.stockHoldings[ticker];
+        renderStockGrid();
+        updateSummary();
+    }
+
+    /* --- Other investments (bonds, ETFs, savings) --- */
+    function renderOtherInvestments() {
+        var container = app.el("other-investments");
         container.innerHTML = "";
 
-        data.investmentTypes.forEach(function (type) {
+        data.otherInvestments.forEach(function (inv) {
             var card = document.createElement("div");
             card.className = "alloc-card";
-            card.style.borderLeftColor = type.color;
+            card.style.borderLeftColor = inv.color;
 
-            var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
-            var returnRange = type.typicalReturn.min + "% to +" + type.typicalReturn.max + "%";
+            var val = app.state.otherHoldings[inv.id] || 0;
+            var minSign = inv.typicalReturn.min >= 0 ? "+" : "";
+            var returnRange = minSign + inv.typicalReturn.min + "% to +" + inv.typicalReturn.max + "%";
 
             card.innerHTML =
                 '<div class="alloc-card-header">' +
-                    '<span class="alloc-card-icon">' + type.icon + '</span>' +
-                    '<span class="alloc-card-title">' + type.name + '</span>' +
+                    '<span class="alloc-card-icon">' + inv.icon + '</span>' +
+                    '<span class="alloc-card-title">' + inv.name + '</span>' +
                 '</div>' +
                 '<div class="alloc-card-meta">' +
-                    '<span class="meta-tag">Risk: ' + riskLabels[type.riskLevel] + '</span>' +
                     '<span class="meta-tag">Return: ' + returnRange + '/yr</span>' +
                 '</div>' +
-                '<p class="alloc-card-desc">' + type.description.split(".")[0] + '.</p>' +
+                '<p class="alloc-card-desc">' + inv.description.split(".")[0] + '.</p>' +
                 '<div class="alloc-slider-row">' +
                     '<input type="range" class="alloc-slider" ' +
-                        'id="slider-' + type.id + '" ' +
-                        'min="0" max="' + data.BUDGET + '" step="100" value="0" ' +
-                        'aria-label="' + type.name + ' allocation" ' +
-                        'style="accent-color: ' + type.color + '">' +
+                        'id="slider-' + inv.id + '" ' +
+                        'min="0" max="' + data.BUDGET + '" step="100" value="' + val + '" ' +
+                        'aria-label="' + inv.name + ' allocation" ' +
+                        'style="accent-color: ' + inv.color + '">' +
                     '<div class="alloc-input-group">' +
                         '<span class="dollar-sign">$</span>' +
                         '<input type="number" class="alloc-amount-input" ' +
-                            'id="input-' + type.id + '" ' +
-                            'min="0" max="' + data.BUDGET + '" step="100" value="0" ' +
-                            'aria-label="' + type.name + ' dollar amount">' +
+                            'id="input-' + inv.id + '" ' +
+                            'min="0" max="' + data.BUDGET + '" step="100" value="' + val + '" ' +
+                            'aria-label="' + inv.name + ' dollar amount">' +
                     '</div>' +
-                    '<span class="alloc-pct" id="pct-' + type.id + '">0%</span>' +
                 '</div>';
 
             container.appendChild(card);
 
-            // Bind events
-            var slider = app.el("slider-" + type.id);
-            var input = app.el("input-" + type.id);
+            var slider = app.el("slider-" + inv.id);
+            var input = app.el("input-" + inv.id);
 
             slider.addEventListener("input", function () {
-                var val = parseInt(slider.value, 10);
-                val = constrainAllocation(type.id, val);
-                slider.value = val;
-                input.value = val;
-                app.state.allocations[type.id] = val;
+                var v = parseInt(slider.value, 10);
+                v = constrainOther(inv.id, v);
+                slider.value = v;
+                input.value = v;
+                app.state.otherHoldings[inv.id] = v;
                 updateSummary();
             });
 
             input.addEventListener("input", function () {
-                var val = parseInt(input.value, 10) || 0;
-                val = app.clamp(val, 0, data.BUDGET);
-                val = constrainAllocation(type.id, val);
-                input.value = val;
-                slider.value = val;
-                app.state.allocations[type.id] = val;
+                var v = parseInt(input.value, 10) || 0;
+                v = app.clamp(v, 0, data.BUDGET);
+                v = constrainOther(inv.id, v);
+                input.value = v;
+                slider.value = v;
+                app.state.otherHoldings[inv.id] = v;
                 updateSummary();
             });
         });
     }
 
-    /* --- Constrain so total doesn't exceed budget --- */
-    function constrainAllocation(typeId, value) {
-        var allocs = app.state.allocations;
-        var otherTotal = 0;
-        for (var key in allocs) {
-            if (key !== typeId) otherTotal += allocs[key];
-        }
-        var max = data.BUDGET - otherTotal;
-        return app.clamp(value, 0, max);
+    function constrainOther(id, value) {
+        var remaining = app.getRemaining();
+        var current = app.state.otherHoldings[id] || 0;
+        var maxAllowed = remaining + current;
+        return app.clamp(value, 0, maxAllowed);
     }
 
-    /* --- Get total allocated --- */
-    function getTotal() {
-        var allocs = app.state.allocations;
-        var total = 0;
-        for (var key in allocs) total += allocs[key];
-        return total;
+    /* --- Stock detail modal --- */
+    function initModal() {
+        var overlay = app.el("stock-modal");
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) closeModal();
+        });
+    }
+
+    function showStockModal(ticker) {
+        var stock = app.getStockByTicker(ticker);
+        if (!stock) return;
+
+        var modal = app.el("stock-modal-content");
+        var held = app.state.stockHoldings[ticker] || 0;
+        var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
+
+        modal.innerHTML =
+            '<button class="modal-close" id="modal-close-btn">&times;</button>' +
+            '<div class="modal-header" style="border-bottom-color:' + stock.sectorColor + '">' +
+                '<div><div class="stock-ticker" style="font-size:1.5rem">' + stock.ticker + '</div>' +
+                '<div class="stock-name" style="font-size:1.1rem">' + stock.name + '</div></div>' +
+                '<div class="stock-price" style="font-size:1.5rem">' + app.formatCurrency(stock.price) + '<span class="price-label">/share</span></div>' +
+            '</div>' +
+            '<div class="modal-body">' +
+                '<p style="margin-bottom:1rem; line-height:1.7">' + stock.description + '</p>' +
+                '<div class="modal-stats">' +
+                    '<div class="detail-stat"><div class="detail-stat-value">' + stock.sector + '</div><div class="detail-stat-label">Sector</div></div>' +
+                    '<div class="detail-stat"><div class="detail-stat-value">' + riskLabels[stock.riskLevel] + '</div><div class="detail-stat-label">Risk</div></div>' +
+                    '<div class="detail-stat"><div class="detail-stat-value">' + stock.typicalReturn.average + '%</div><div class="detail-stat-label">Avg Return</div></div>' +
+                    '<div class="detail-stat"><div class="detail-stat-value">' + (stock.dividend > 0 ? stock.dividend + '%' : 'None') + '</div><div class="detail-stat-label">Dividend</div></div>' +
+                '</div>' +
+                '<div class="invest-detail-grid">' +
+                    '<div class="detail-box benefits"><h4>\u2705 Why Buy</h4><ul>' +
+                        stock.whyBuy.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
+                    '</ul></div>' +
+                    '<div class="detail-box risks"><h4>\u26A0\uFE0F Risks</h4><ul>' +
+                        stock.risks.map(function (r) { return '<li>' + r + '</li>'; }).join("") +
+                    '</ul></div>' +
+                '</div>' +
+                '<div class="guidance-box"><h4>\u{1F4A1} Guidance for Beginners</h4><p>' + stock.guidance + '</p></div>' +
+                '<div class="modal-buy-section">' +
+                    '<div class="modal-holding">You own: <strong>' + held + ' share' + (held !== 1 ? 's' : '') + '</strong>' +
+                        (held > 0 ? ' (' + app.formatCurrency(held * stock.price) + ')' : '') +
+                    '</div>' +
+                    '<div class="share-controls share-controls-lg">' +
+                        '<button class="share-btn minus" id="modal-sell" ' + (held === 0 ? 'disabled' : '') + '>&minus;</button>' +
+                        '<span class="share-count">' + held + '</span>' +
+                        '<button class="share-btn plus" id="modal-buy" ' + (app.getRemaining() < stock.price ? 'disabled' : '') + '>+</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+        app.el("stock-modal").style.display = "flex";
+
+        app.el("modal-close-btn").addEventListener("click", closeModal);
+        app.el("modal-buy").addEventListener("click", function () {
+            buyShare(ticker);
+            showStockModal(ticker); // refresh
+        });
+        app.el("modal-sell").addEventListener("click", function () {
+            sellShare(ticker);
+            showStockModal(ticker); // refresh
+        });
+    }
+
+    function closeModal() {
+        app.el("stock-modal").style.display = "none";
     }
 
     /* --- Update all summary displays --- */
     function updateSummary() {
-        var allocs = app.state.allocations;
-        var total = getTotal();
-
-        // Update percentage labels
-        data.investmentTypes.forEach(function (type) {
-            var pctEl = app.el("pct-" + type.id);
-            if (pctEl) {
-                var pct = total > 0 ? (allocs[type.id] / data.BUDGET * 100) : 0;
-                pctEl.textContent = Math.round(pct) + "%";
-            }
-        });
+        var totalSpent = app.getTotalSpent();
+        var remaining = app.getRemaining();
 
         // Budget bar
-        var pct = (total / data.BUDGET) * 100;
+        var pct = (totalSpent / data.BUDGET) * 100;
         var fill = app.el("budget-bar-fill");
         fill.style.width = Math.min(pct, 100) + "%";
-        fill.classList.toggle("over-budget", total > data.BUDGET);
+        fill.classList.toggle("over-budget", totalSpent > data.BUDGET);
+        app.el("budget-allocated").textContent = app.formatCurrency(totalSpent);
+        app.el("budget-remaining").textContent = app.formatCurrency(remaining) + " remaining";
 
-        app.el("budget-allocated").textContent = app.formatCurrency(total);
-        app.el("budget-remaining").textContent = app.formatCurrency(data.BUDGET - total) + " remaining";
+        // Holdings list
+        updateHoldingsList();
 
-        // Diversification score
+        // Diversification
         var divScore = calcDiversification();
         app.el("diversification-score").textContent = Math.round(divScore);
         app.el("diversification-bar").style.width = divScore + "%";
 
-        // Risk level
+        // Risk
         updateRiskGauge();
 
-        // Expected return
-        updateReturnRange();
+        // Dividends
+        updateDividendIncome();
 
         // Advice
         updateAdvice();
 
         // Pie chart
-        if (window.ChartManager) ChartManager.updateAllocationPie(allocs);
+        if (window.ChartManager) ChartManager.updateAllocationPie(getAllocationMap());
     }
 
-    /* --- Diversification score (Shannon entropy, normalized 0-100) --- */
+    /* --- Holdings list in sidebar --- */
+    function updateHoldingsList() {
+        var container = app.el("holdings-list");
+        var totalSpent = app.getTotalSpent();
+
+        if (totalSpent === 0) {
+            container.innerHTML = '<p class="advice-empty">No investments yet. Start buying below!</p>';
+            return;
+        }
+
+        var html = '';
+        var holdings = app.state.stockHoldings;
+        var tickers = Object.keys(holdings).sort();
+
+        tickers.forEach(function (ticker) {
+            var stock = app.getStockByTicker(ticker);
+            if (!stock) return;
+            var shares = holdings[ticker];
+            var value = shares * stock.price;
+            html += '<div class="holding-row">' +
+                '<span class="holding-name" style="color:' + stock.sectorColor + '">' + ticker + '</span>' +
+                '<span class="holding-detail">' + shares + ' share' + (shares !== 1 ? 's' : '') + '</span>' +
+                '<span class="holding-value">' + app.formatCurrency(value) + '</span>' +
+            '</div>';
+        });
+
+        data.otherInvestments.forEach(function (inv) {
+            var val = app.state.otherHoldings[inv.id] || 0;
+            if (val > 0) {
+                html += '<div class="holding-row">' +
+                    '<span class="holding-name" style="color:' + inv.color + '">' + inv.icon + ' ' + inv.name + '</span>' +
+                    '<span class="holding-detail"></span>' +
+                    '<span class="holding-value">' + app.formatCurrency(val) + '</span>' +
+                '</div>';
+            }
+        });
+
+        html += '<div class="holding-row holding-total">' +
+            '<span class="holding-name">Total</span>' +
+            '<span class="holding-detail"></span>' +
+            '<span class="holding-value">' + app.formatCurrency(totalSpent) + '</span>' +
+        '</div>';
+
+        container.innerHTML = html;
+    }
+
+    /* --- Build allocation map for charts/simulation --- */
+    function getAllocationMap() {
+        var map = {};
+        var holdings = app.state.stockHoldings;
+
+        for (var ticker in holdings) {
+            var stock = app.getStockByTicker(ticker);
+            if (stock) map[ticker] = holdings[ticker] * stock.price;
+        }
+
+        data.otherInvestments.forEach(function (inv) {
+            var val = app.state.otherHoldings[inv.id] || 0;
+            if (val > 0) map[inv.id] = val;
+        });
+
+        return map;
+    }
+
+    /* --- Diversification (Shannon entropy) --- */
     function calcDiversification() {
-        var allocs = app.state.allocations;
-        var total = getTotal();
+        var map = getAllocationMap();
+        var keys = Object.keys(map);
+        if (keys.length === 0) return 0;
+
+        var total = 0;
+        keys.forEach(function (k) { total += map[k]; });
         if (total === 0) return 0;
 
-        var types = data.investmentTypes;
-        var n = types.length;
-        var maxEntropy = Math.log(n);
-        var entropy = 0;
+        // Use sector-level diversification for stocks + other categories
+        var sectorTotals = {};
+        for (var ticker in app.state.stockHoldings) {
+            var stock = app.getStockByTicker(ticker);
+            if (!stock) continue;
+            var val = app.state.stockHoldings[ticker] * stock.price;
+            sectorTotals[stock.sector] = (sectorTotals[stock.sector] || 0) + val;
+        }
+        data.otherInvestments.forEach(function (inv) {
+            var v = app.state.otherHoldings[inv.id] || 0;
+            if (v > 0) sectorTotals[inv.id] = v;
+        });
 
-        types.forEach(function (type) {
-            var p = allocs[type.id] / total;
+        var cats = Object.keys(sectorTotals);
+        if (cats.length <= 1) return cats.length === 1 ? 15 : 0;
+
+        var maxEntropy = Math.log(cats.length);
+        var entropy = 0;
+        cats.forEach(function (c) {
+            var p = sectorTotals[c] / total;
             if (p > 0) entropy -= p * Math.log(p);
         });
 
@@ -158,146 +397,158 @@ window.Portfolio = (function () {
 
     /* --- Risk gauge --- */
     function updateRiskGauge() {
-        var allocs = app.state.allocations;
-        var total = getTotal();
-        var riskLabels = ["—", "Very Low", "Low", "Moderate", "High", "Very High"];
+        var totalSpent = app.getTotalSpent();
+        var riskLabels = ["\u2014", "Very Low", "Low", "Moderate", "High", "Very High"];
 
-        if (total === 0) {
-            app.el("risk-level").textContent = "—";
+        if (totalSpent === 0) {
+            app.el("risk-level").textContent = "\u2014";
             app.qsa(".risk-dot").forEach(function (dot) { dot.className = "risk-dot"; });
             return;
         }
 
         var weightedRisk = 0;
-        data.investmentTypes.forEach(function (type) {
-            weightedRisk += (allocs[type.id] / total) * type.riskLevel;
+
+        for (var ticker in app.state.stockHoldings) {
+            var stock = app.getStockByTicker(ticker);
+            if (!stock) continue;
+            var val = app.state.stockHoldings[ticker] * stock.price;
+            weightedRisk += (val / totalSpent) * stock.riskLevel;
+        }
+
+        data.otherInvestments.forEach(function (inv) {
+            var v = app.state.otherHoldings[inv.id] || 0;
+            if (v > 0) weightedRisk += (v / totalSpent) * inv.riskLevel;
         });
 
         var riskInt = Math.round(weightedRisk);
         riskInt = app.clamp(riskInt, 1, 5);
 
         app.el("risk-level").textContent = riskLabels[riskInt];
-
         app.qsa(".risk-dot").forEach(function (dot) {
             var level = parseInt(dot.dataset.level, 10);
             dot.className = "risk-dot";
-            if (level <= riskInt) {
-                dot.classList.add("active-" + level);
-            }
+            if (level <= riskInt) dot.classList.add("active-" + level);
         });
     }
 
-    /* --- Expected return range --- */
-    function updateReturnRange() {
-        var allocs = app.state.allocations;
-        var total = getTotal();
-        var rangeEl = app.el("return-range");
-
-        if (total === 0) {
-            rangeEl.textContent = "—";
-            rangeEl.style.color = "";
-            return;
+    /* --- Dividend income --- */
+    function updateDividendIncome() {
+        var totalDiv = 0;
+        for (var ticker in app.state.stockHoldings) {
+            var stock = app.getStockByTicker(ticker);
+            if (!stock || !stock.dividend) continue;
+            var invested = app.state.stockHoldings[ticker] * stock.price;
+            totalDiv += invested * (stock.dividend / 100);
         }
 
-        var weightedMin = 0, weightedMax = 0;
-        data.investmentTypes.forEach(function (type) {
-            var w = allocs[type.id] / total;
-            weightedMin += w * type.typicalReturn.min;
-            weightedMax += w * type.typicalReturn.max;
-        });
-
-        rangeEl.textContent = weightedMin.toFixed(1) + "% to +" + weightedMax.toFixed(1) + "% / year";
-        rangeEl.style.color = weightedMin >= 0 ? "var(--color-success)" : "";
+        var el = app.el("dividend-income");
+        if (totalDiv > 0) {
+            el.textContent = app.formatCurrency(totalDiv) + " / year";
+            el.style.color = "var(--color-success)";
+        } else {
+            el.textContent = "\u2014";
+            el.style.color = "";
+        }
     }
 
     /* --- Advice engine --- */
     function updateAdvice() {
-        var allocs = app.state.allocations;
-        var total = getTotal();
+        var totalSpent = app.getTotalSpent();
         var adviceList = app.el("advice-list");
         var messages = [];
 
-        if (total === 0) {
-            adviceList.innerHTML = '<p class="advice-empty">Start allocating your budget to receive personalized advice.</p>';
+        if (totalSpent === 0) {
+            adviceList.innerHTML = '<p class="advice-empty">Start investing to receive personalized guidance.</p>';
             return;
         }
 
-        var pcts = {};
-        data.investmentTypes.forEach(function (type) {
-            pcts[type.id] = (allocs[type.id] / total) * 100;
-        });
-
-        // Check for heavy concentration
-        data.investmentTypes.forEach(function (type) {
-            if (pcts[type.id] > 70) {
-                messages.push({
-                    type: "warning",
-                    icon: "\u26A0\uFE0F",
-                    text: "Your portfolio is heavily concentrated in " + type.name + " (" + Math.round(pcts[type.id]) + "%). Consider spreading your investments more broadly to reduce risk."
-                });
+        // Sector concentration
+        var sectorPcts = {};
+        for (var ticker in app.state.stockHoldings) {
+            var stock = app.getStockByTicker(ticker);
+            if (!stock) continue;
+            var val = app.state.stockHoldings[ticker] * stock.price;
+            sectorPcts[stock.sector] = (sectorPcts[stock.sector] || 0) + val;
+        }
+        for (var sec in sectorPcts) {
+            var pct = (sectorPcts[sec] / totalSpent) * 100;
+            if (pct > 60) {
+                messages.push({ type: "warning", icon: "\u26A0\uFE0F",
+                    text: Math.round(pct) + "% of your portfolio is in " + sec + ". If this sector has a bad year, your whole portfolio takes a big hit. Consider diversifying into other sectors." });
             }
-        });
-
-        // Too much in savings
-        if (pcts.savings > 50) {
-            messages.push({
-                type: "warning",
-                icon: "\u{1F4A1}",
-                text: "More than half your portfolio is in savings. While very safe, this may not keep up with inflation over time. Consider allocating some to growth investments if your timeline is long."
-            });
         }
 
-        // Missing asset classes
-        data.investmentTypes.forEach(function (type) {
-            if (allocs[type.id] === 0 && total > 0) {
-                messages.push({
-                    type: "info",
-                    icon: "\u{1F4CC}",
-                    text: "You haven't allocated anything to " + type.name + ". Adding even a small amount can improve diversification."
-                });
+        // Single stock concentration
+        for (var t in app.state.stockHoldings) {
+            var s = app.getStockByTicker(t);
+            if (!s) continue;
+            var v = app.state.stockHoldings[t] * s.price;
+            var sp = (v / totalSpent) * 100;
+            if (sp > 40) {
+                messages.push({ type: "warning", icon: "\u26A0\uFE0F",
+                    text: Math.round(sp) + "% of your portfolio is in " + s.name + " alone. Even great companies can have bad years. Spreading your investment reduces this risk." });
             }
-        });
-
-        // Very conservative
-        if ((pcts.bonds || 0) + (pcts.savings || 0) > 80) {
-            messages.push({
-                type: "info",
-                icon: "\u{1F6E1}\uFE0F",
-                text: "Your portfolio is very conservative. This is great for short-term goals (1-3 years), but may underperform over longer periods."
-            });
         }
 
-        // Very aggressive
-        if ((pcts.stocks || 0) > 50 && (pcts.savings || 0) < 10) {
-            messages.push({
-                type: "info",
-                icon: "\u{1F680}",
-                text: "Your portfolio leans aggressive. This could deliver strong long-term returns, but expect some bumpy years. Make sure you won't need this money soon."
-            });
+        // All in stocks, no bonds/savings
+        var stockTotal = 0;
+        for (var tk in app.state.stockHoldings) {
+            var st = app.getStockByTicker(tk);
+            if (st) stockTotal += app.state.stockHoldings[tk] * st.price;
+        }
+        var stockPct = (stockTotal / totalSpent) * 100;
+        var bondsSavings = (app.state.otherHoldings.bonds || 0) + (app.state.otherHoldings.savings || 0);
+
+        if (stockPct > 80 && bondsSavings === 0) {
+            messages.push({ type: "info", icon: "\u{1F680}",
+                text: "Your portfolio is almost entirely stocks. This is aggressive \u2014 great for long-term growth, but consider adding some bonds or savings as a safety cushion." });
         }
 
-        // Well balanced
+        // All in safe stuff
+        if (bondsSavings > totalSpent * 0.7 && stockTotal === 0) {
+            messages.push({ type: "info", icon: "\u{1F6E1}\uFE0F",
+                text: "Your portfolio is very conservative with no stocks. This is safe but may not beat inflation over time. Even a small stock allocation can boost long-term returns." });
+        }
+
+        // No dividends
+        var hasDividends = false;
+        for (var d in app.state.stockHoldings) {
+            var ds = app.getStockByTicker(d);
+            if (ds && ds.dividend > 0) { hasDividends = true; break; }
+        }
+        if (stockTotal > 0 && !hasDividends) {
+            messages.push({ type: "info", icon: "\u{1F4B0}",
+                text: "None of your stocks pay dividends. Consider adding dividend-paying stocks like Coca-Cola or J&J for passive income alongside growth." });
+        }
+
+        // Good diversification
         var divScore = calcDiversification();
-        if (divScore > 80 && total >= data.BUDGET * 0.5) {
-            messages.push({
-                type: "success",
-                icon: "\u2705",
-                text: "Great job! Your portfolio is well-diversified. This balanced approach helps manage risk while maintaining growth potential."
-            });
+        if (divScore > 70 && totalSpent >= data.BUDGET * 0.5) {
+            messages.push({ type: "success", icon: "\u2705",
+                text: "Nice work! Your portfolio is well-diversified across sectors and investment types. This balanced approach helps manage risk." });
         }
 
-        // Budget fully allocated
-        if (total === data.BUDGET) {
-            messages.push({
-                type: "success",
-                icon: "\u{1F389}",
-                text: "You've allocated your full $10,000 budget! Head over to the Simulate tab to see how your portfolio might perform over time."
-            });
+        // High risk stocks
+        var highRiskPct = 0;
+        for (var hr in app.state.stockHoldings) {
+            var hrs = app.getStockByTicker(hr);
+            if (hrs && hrs.riskLevel >= 4) {
+                highRiskPct += (app.state.stockHoldings[hr] * hrs.price / totalSpent) * 100;
+            }
+        }
+        if (highRiskPct > 50) {
+            messages.push({ type: "warning", icon: "\u{1F3A2}",
+                text: "Over half your portfolio is in high-risk stocks. These can deliver big gains but also steep losses. Make sure you won't need this money in the short term." });
         }
 
-        // Render
+        // Budget fully used
+        if (totalSpent >= data.BUDGET * 0.95) {
+            messages.push({ type: "success", icon: "\u{1F389}",
+                text: "You've invested most of your $10,000 budget! Head to the Simulate tab to see how your portfolio might grow over time." });
+        }
+
         if (messages.length === 0) {
-            adviceList.innerHTML = '<p class="advice-empty">Looking good! Keep adjusting your allocation.</p>';
+            adviceList.innerHTML = '<p class="advice-empty">Looking good! Keep building your portfolio.</p>';
             return;
         }
 
@@ -309,23 +560,42 @@ window.Portfolio = (function () {
         }).join("");
     }
 
-    /* --- Set allocations programmatically (used by Quiz) --- */
-    function setAllocations(newAllocs) {
-        data.investmentTypes.forEach(function (type) {
-            var val = Math.round((newAllocs[type.id] / 100) * data.BUDGET);
-            app.state.allocations[type.id] = val;
+    /* --- Set holdings programmatically (used by Quiz) --- */
+    function setHoldings(suggested) {
+        // Clear existing
+        app.state.stockHoldings = {};
+        app.state.otherHoldings = { bonds: 0, etfs: 0, savings: 0 };
 
-            var slider = app.el("slider-" + type.id);
-            var input = app.el("input-" + type.id);
-            if (slider) slider.value = val;
-            if (input) input.value = val;
-        });
+        // Set stocks
+        if (suggested.stocks) {
+            for (var ticker in suggested.stocks) {
+                app.state.stockHoldings[ticker] = suggested.stocks[ticker];
+            }
+        }
+
+        // Set others
+        if (suggested.bonds !== undefined) app.state.otherHoldings.bonds = suggested.bonds;
+        if (suggested.etfs !== undefined) app.state.otherHoldings.etfs = suggested.etfs;
+        if (suggested.savings !== undefined) app.state.otherHoldings.savings = suggested.savings;
+
+        // Re-render
+        renderStockGrid();
+        renderOtherInvestments();
         updateSummary();
+    }
+
+    function getTotal() {
+        return app.getTotalSpent();
+    }
+
+    function getAllocMap() {
+        return getAllocationMap();
     }
 
     return {
         init: init,
-        setAllocations: setAllocations,
-        getTotal: getTotal
+        setHoldings: setHoldings,
+        getTotal: getTotal,
+        getAllocMap: getAllocMap
     };
 })();

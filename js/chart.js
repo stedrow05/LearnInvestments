@@ -11,8 +11,34 @@ window.ChartManager = (function () {
         app = window.App;
     }
 
+    /* --- Get color for an allocation key --- */
+    function getColor(key) {
+        // Check if it's a stock ticker
+        var stock = app.getStockByTicker(key);
+        if (stock) return stock.sectorColor;
+
+        // Check other investments
+        for (var i = 0; i < data.otherInvestments.length; i++) {
+            if (data.otherInvestments[i].id === key) return data.otherInvestments[i].color;
+        }
+
+        return "#999";
+    }
+
+    /* --- Get display name for an allocation key --- */
+    function getName(key) {
+        var stock = app.getStockByTicker(key);
+        if (stock) return stock.ticker + " (" + stock.name + ")";
+
+        for (var i = 0; i < data.otherInvestments.length; i++) {
+            if (data.otherInvestments[i].id === key) return data.otherInvestments[i].name;
+        }
+
+        return key;
+    }
+
     /* --- Allocation Pie Chart --- */
-    function updateAllocationPie(allocations) {
+    function updateAllocationPie(allocMap) {
         var canvas = app.el("allocation-pie");
         if (!canvas) return;
 
@@ -20,20 +46,16 @@ window.ChartManager = (function () {
         var values = [];
         var colors = [];
 
-        data.investmentTypes.forEach(function (type) {
-            var val = allocations[type.id] || 0;
-            if (val > 0) {
-                labels.push(type.name);
-                values.push(val);
-                colors.push(type.color);
+        for (var key in allocMap) {
+            if (allocMap[key] > 0) {
+                labels.push(getName(key));
+                values.push(allocMap[key]);
+                colors.push(getColor(key));
             }
-        });
+        }
 
         if (values.length === 0) {
-            if (pieChart) {
-                pieChart.destroy();
-                pieChart = null;
-            }
+            if (pieChart) { pieChart.destroy(); pieChart = null; }
             return;
         }
 
@@ -64,10 +86,10 @@ window.ChartManager = (function () {
                     legend: {
                         position: "bottom",
                         labels: {
-                            padding: 12,
+                            padding: 10,
                             usePointStyle: true,
                             pointStyle: "circle",
-                            font: { size: 12 }
+                            font: { size: 11 }
                         }
                     },
                     tooltip: {
@@ -89,16 +111,12 @@ window.ChartManager = (function () {
         var canvas = app.el("sim-chart");
         if (!canvas) return;
 
-        if (growthChart) {
-            growthChart.destroy();
-            growthChart = null;
-        }
+        if (growthChart) { growthChart.destroy(); growthChart = null; }
 
         var years = userP.length;
         var labels = ["Start"];
         for (var i = 1; i <= years; i++) labels.push("Year " + i);
 
-        // Prepend initial values
         var userMedian = [initialTotal].concat(userP.map(function (p) { return p.p50; }));
         var userLow = [initialTotal].concat(userP.map(function (p) { return p.p10; }));
         var userHigh = [initialTotal].concat(userP.map(function (p) { return p.p90; }));
@@ -173,10 +191,7 @@ window.ChartManager = (function () {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: "index",
-                    intersect: false
-                },
+                interaction: { mode: "index", intersect: false },
                 scales: {
                     y: {
                         beginAtZero: false,
@@ -188,29 +203,17 @@ window.ChartManager = (function () {
                             },
                             font: { size: 12 }
                         },
-                        grid: {
-                            color: "rgba(0,0,0,0.05)"
-                        }
+                        grid: { color: "rgba(0,0,0,0.05)" }
                     },
                     x: {
-                        ticks: {
-                            font: { size: 12 },
-                            maxTicksLimit: 15
-                        },
-                        grid: {
-                            display: false
-                        }
+                        ticks: { font: { size: 12 }, maxTicksLimit: 15 },
+                        grid: { display: false }
                     }
                 },
                 plugins: {
                     legend: {
                         position: "bottom",
-                        labels: {
-                            padding: 16,
-                            usePointStyle: true,
-                            pointStyle: "line",
-                            font: { size: 12 }
-                        }
+                        labels: { padding: 16, usePointStyle: true, pointStyle: "line", font: { size: 12 } }
                     },
                     tooltip: {
                         callbacks: {
@@ -220,13 +223,10 @@ window.ChartManager = (function () {
                         }
                     }
                 },
-                layout: {
-                    padding: { top: 10, bottom: 10 }
-                }
+                layout: { padding: { top: 10, bottom: 10 } }
             }
         });
 
-        // Force canvas container height
         canvas.parentElement.style.minHeight = "400px";
     }
 

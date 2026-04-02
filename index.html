@@ -23,17 +23,17 @@
 
     <main class="app-main">
         <!-- ========== PORTFOLIO BUILDER ========== -->
-        <section id="tab-portfolio" class="tab-panel active" role="tabpanel" aria-labelledby="tab-portfolio">
+        <section id="tab-portfolio" class="tab-panel active" role="tabpanel">
             <div class="section-header">
                 <h2>Build Your Portfolio</h2>
-                <p class="section-desc">Allocate your virtual $10,000 across different investment types. Watch how your choices affect risk and potential returns.</p>
+                <p class="section-desc">You have $10,000 to invest. Buy shares of real companies, allocate to bonds, ETFs, or savings. Get guidance on every choice.</p>
             </div>
 
             <div class="budget-bar-container">
                 <div class="budget-info">
-                    <span class="budget-label">Budget</span>
+                    <span class="budget-label">Your Budget</span>
                     <span class="budget-numbers">
-                        <span id="budget-allocated">$0</span> of <span id="budget-total">$10,000</span> allocated
+                        <span id="budget-allocated">$0</span> of <span id="budget-total">$10,000</span> invested
                     </span>
                 </div>
                 <div class="budget-bar">
@@ -43,14 +43,39 @@
             </div>
 
             <div class="portfolio-layout">
-                <div class="allocation-cards" id="allocation-cards">
-                    <!-- Cards rendered by portfolio.js -->
+                <div class="portfolio-main-col">
+                    <!-- Stock Marketplace -->
+                    <div class="marketplace-section">
+                        <div class="marketplace-header">
+                            <h3>Buy Stocks</h3>
+                            <div class="sector-filters" id="sector-filters">
+                                <button class="filter-btn active" data-sector="all">All</button>
+                            </div>
+                        </div>
+                        <div class="stock-grid" id="stock-grid">
+                            <!-- Rendered by portfolio.js -->
+                        </div>
+                    </div>
+
+                    <!-- Other Investments -->
+                    <div class="other-investments-section">
+                        <h3>Other Investments</h3>
+                        <div class="other-investments" id="other-investments">
+                            <!-- Rendered by portfolio.js -->
+                        </div>
+                    </div>
                 </div>
 
                 <aside class="summary-panel" id="summary-panel">
                     <div class="summary-card">
-                        <h3>Portfolio Summary</h3>
+                        <h3>Your Holdings</h3>
+                        <div class="holdings-list" id="holdings-list">
+                            <p class="advice-empty">No investments yet. Start buying below!</p>
+                        </div>
+                    </div>
 
+                    <div class="summary-card">
+                        <h3>Portfolio Summary</h3>
                         <div class="summary-item">
                             <div class="summary-label">Diversification Score</div>
                             <div class="score-display">
@@ -65,7 +90,7 @@
                         <div class="summary-item">
                             <div class="summary-label">Risk Level</div>
                             <div class="risk-gauge" id="risk-gauge">
-                                <div class="risk-level" id="risk-level">—</div>
+                                <div class="risk-level" id="risk-level">&mdash;</div>
                                 <div class="risk-dots">
                                     <span class="risk-dot" data-level="1"></span>
                                     <span class="risk-dot" data-level="2"></span>
@@ -77,8 +102,8 @@
                         </div>
 
                         <div class="summary-item">
-                            <div class="summary-label">Expected Annual Return</div>
-                            <div class="return-range" id="return-range">—</div>
+                            <div class="summary-label">Est. Annual Dividend Income</div>
+                            <div class="return-range" id="dividend-income">&mdash;</div>
                         </div>
 
                         <div class="allocation-chart-container">
@@ -89,7 +114,7 @@
                     <div class="advice-panel" id="advice-panel">
                         <h3>Advice</h3>
                         <div class="advice-list" id="advice-list">
-                            <p class="advice-empty">Start allocating your budget to receive personalized advice.</p>
+                            <p class="advice-empty">Start investing to receive personalized guidance.</p>
                         </div>
                     </div>
                 </aside>
@@ -97,7 +122,7 @@
         </section>
 
         <!-- ========== SIMULATION ========== -->
-        <section id="tab-simulate" class="tab-panel" role="tabpanel" aria-labelledby="tab-simulate">
+        <section id="tab-simulate" class="tab-panel" role="tabpanel">
             <div class="section-header">
                 <h2>Simulate Your Portfolio</h2>
                 <p class="section-desc">See how your portfolio might perform over time based on historical patterns. Remember, past performance doesn't guarantee future results.</p>
@@ -117,7 +142,7 @@
             <div class="sim-chart-container">
                 <canvas id="sim-chart"></canvas>
                 <div class="sim-no-data" id="sim-no-data">
-                    <p>Allocate funds in the <strong>Portfolio</strong> tab, then run a simulation to see projected growth.</p>
+                    <p>Buy stocks or allocate funds in the <strong>Portfolio</strong> tab, then run a simulation to see projected growth.</p>
                 </div>
             </div>
 
@@ -125,15 +150,15 @@
                 <div class="sim-results-grid">
                     <div class="result-card">
                         <div class="result-label">Final Value (Median)</div>
-                        <div class="result-value" id="result-median">—</div>
+                        <div class="result-value" id="result-median">&mdash;</div>
                     </div>
                     <div class="result-card">
                         <div class="result-label">Likely Range</div>
-                        <div class="result-value" id="result-range">—</div>
+                        <div class="result-value" id="result-range">&mdash;</div>
                     </div>
                     <div class="result-card">
                         <div class="result-label">Total Return</div>
-                        <div class="result-value" id="result-return">—</div>
+                        <div class="result-value" id="result-return">&mdash;</div>
                     </div>
                 </div>
 
@@ -145,20 +170,27 @@
         </section>
 
         <!-- ========== LEARN ========== -->
-        <section id="tab-learn" class="tab-panel" role="tabpanel" aria-labelledby="tab-learn">
+        <section id="tab-learn" class="tab-panel" role="tabpanel">
             <div class="section-header">
                 <h2>Learn About Investing</h2>
-                <p class="section-desc">Explore each investment type, browse the glossary, and pick up tips to start your investing journey with confidence.</p>
+                <p class="section-desc">Explore each stock and investment type, browse the glossary, and pick up tips to invest with confidence.</p>
             </div>
 
             <div class="learn-tabs">
-                <button class="learn-tab-btn active" data-learn-tab="types">Investment Types</button>
+                <button class="learn-tab-btn active" data-learn-tab="companies">Companies</button>
+                <button class="learn-tab-btn" data-learn-tab="types">Other Investments</button>
                 <button class="learn-tab-btn" data-learn-tab="glossary">Glossary</button>
-                <button class="learn-tab-btn" data-learn-tab="tips">Tips & Mistakes</button>
+                <button class="learn-tab-btn" data-learn-tab="tips">Tips</button>
             </div>
 
             <div class="learn-content">
-                <div class="learn-panel active" id="learn-types">
+                <div class="learn-panel active" id="learn-companies">
+                    <div class="accordion" id="company-accordion">
+                        <!-- Rendered by education.js -->
+                    </div>
+                </div>
+
+                <div class="learn-panel" id="learn-types">
                     <div class="accordion" id="investment-accordion">
                         <!-- Rendered by education.js -->
                     </div>
@@ -168,24 +200,20 @@
                     <div class="glossary-search">
                         <input type="text" id="glossary-search-input" placeholder="Search terms..." aria-label="Search glossary">
                     </div>
-                    <div class="glossary-list" id="glossary-list">
-                        <!-- Rendered by education.js -->
-                    </div>
+                    <div class="glossary-list" id="glossary-list"></div>
                 </div>
 
                 <div class="learn-panel" id="learn-tips">
-                    <div class="tips-list" id="tips-list">
-                        <!-- Rendered by education.js -->
-                    </div>
+                    <div class="tips-list" id="tips-list"></div>
                 </div>
             </div>
         </section>
 
         <!-- ========== QUIZ ========== -->
-        <section id="tab-quiz" class="tab-panel" role="tabpanel" aria-labelledby="tab-quiz">
+        <section id="tab-quiz" class="tab-panel" role="tabpanel">
             <div class="section-header">
                 <h2>Risk Tolerance Quiz</h2>
-                <p class="section-desc">Answer a few questions to discover your investor profile and get a suggested portfolio allocation.</p>
+                <p class="section-desc">Answer a few questions to discover your investor profile and get a suggested portfolio with specific stocks.</p>
             </div>
 
             <div class="quiz-container" id="quiz-container">
@@ -196,9 +224,7 @@
                     <span class="quiz-progress-text" id="quiz-progress-text">Question 1 of 10</span>
                 </div>
 
-                <div class="quiz-question-area" id="quiz-question-area">
-                    <!-- Rendered by quiz.js -->
-                </div>
+                <div class="quiz-question-area" id="quiz-question-area"></div>
 
                 <div class="quiz-nav">
                     <button class="btn btn-secondary" id="quiz-prev-btn" disabled>Back</button>
@@ -207,21 +233,26 @@
             </div>
 
             <div class="quiz-results" id="quiz-results" style="display: none;">
-                <div class="quiz-profile-card" id="quiz-profile-card">
-                    <!-- Rendered by quiz.js -->
-                </div>
+                <div class="quiz-profile-card" id="quiz-profile-card"></div>
             </div>
         </section>
     </main>
 
     <footer class="app-footer">
-        <p>This is an educational simulator only. It does not constitute financial advice. Past performance does not guarantee future results.</p>
+        <p>This is an educational simulator only. It does not constitute financial advice. Stock prices shown are sample prices for learning purposes. Past performance does not guarantee future results.</p>
     </footer>
 
-    <!-- Glossary Popover (shared, positioned by JS) -->
+    <!-- Glossary Popover -->
     <div class="glossary-popover" id="glossary-popover" style="display: none;">
         <div class="popover-term" id="popover-term"></div>
         <div class="popover-definition" id="popover-definition"></div>
+    </div>
+
+    <!-- Stock Detail Modal -->
+    <div class="modal-overlay" id="stock-modal" style="display: none;">
+        <div class="modal-content" id="stock-modal-content">
+            <!-- Rendered by portfolio.js -->
+        </div>
     </div>
 
     <script src="js/data.js"></script>
