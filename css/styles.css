@@ -1553,6 +1553,19 @@ a {
 }
 
 /* ===== Stock Lookup Bar ===== */
+.marketplace-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.price-status {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 .stock-lookup-bar {
     margin-bottom: 1rem;
 }
