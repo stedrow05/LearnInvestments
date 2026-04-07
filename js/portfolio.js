@@ -597,7 +597,7 @@ window.Portfolio = (function () {
         return getAllocationMap();
     }
 
-    /* --- Live stock price lookup (Stooq CSV, manual fallback) --- */
+    /* --- Live stock price lookup (web scraping + CSV, manual fallback) --- */
     function initStockLookup() {
         var input = app.el("lookup-ticker-input");
         var btn = app.el("lookup-btn");
@@ -616,10 +616,10 @@ window.Portfolio = (function () {
             resultEl.innerHTML = '<span class="lookup-loading">Looking up ' + ticker + '&hellip;</span>';
             btn.disabled = true;
 
-            fetchStooqPrice(ticker, function (name, price) {
+            fetchLivePrice(ticker, function (name, price) {
                 btn.disabled = false;
-                if (name && price) {
-                    showLookupResult(ticker, name, price);
+                if (price && price > 0) {
+                    showLookupResult(ticker, name || ticker, price);
                 } else {
                     showManualEntry(ticker);
                 }
@@ -627,53 +627,79 @@ window.Portfolio = (function () {
         }
 
         /*
-         * Fetch price from Stooq.com CSV endpoint.
-         * Stooq uses a ".US" suffix for US-listed stocks (e.g. AAPL.US).
-         * CSV columns (format string sd2t2ohlcvn):
-         *   0=Symbol, 1=Date, 2=Time, 3=Open, 4=High, 5=Low, 6=Close, 7=Volume, 8=Name
-         * Falls back to allorigins proxy if the direct request is blocked by CORS.
+         * Try multiple data sources in order:
+         *  1. Scrape Yahoo Finance page HTML via allorigins proxy — parse the
+         *     JSON data Yahoo embeds in the page (regularMarketPrice / shortName)
+         *  2. Stooq CSV via allorigins proxy — simple CSV, Close at column 6
+         *  3. Stooq CSV direct — in case CORS is allowed
+         * Calls back with (name, price) on success, or (null, null) on total failure.
          */
-        function fetchStooqPrice(ticker, callback) {
+        function fetchLivePrice(ticker, callback) {
             var sym = (ticker.indexOf(".") === -1 ? ticker + ".US" : ticker).toLowerCase();
-            var csvUrl = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcvn&h&e=csv";
 
-            var urls = [
-                csvUrl,
-                "https://api.allorigins.win/raw?url=" + encodeURIComponent(csvUrl)
+            var yahooPage = "https://finance.yahoo.com/quote/" + encodeURIComponent(ticker) + "/";
+            var stooqCsv  = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcv&h&e=csv";
+
+            var attempts = [
+                { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooPage), parse: parseYahooHtml },
+                { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(stooqCsv),  parse: parseStooqCsv  },
+                { url: stooqCsv,                                                               parse: parseStooqCsv  }
             ];
 
             function tryNext(i) {
-                if (i >= urls.length) { callback(null, null); return; }
-
-                fetch(urls[i])
+                if (i >= attempts.length) { callback(null, null); return; }
+                var a = attempts[i];
+                fetch(a.url)
                     .then(function (res) {
                         if (!res.ok) throw new Error("HTTP " + res.status);
                         return res.text();
                     })
-                    .then(function (csv) {
-                        var lines = csv.trim().split("\n");
-                        if (lines.length < 2) { tryNext(i + 1); return; }
-
-                        // Strip carriage returns and split on comma
-                        var cols = lines[1].replace(/\r/g, "").split(",");
-                        var closeStr = cols[6] && cols[6].trim();
-                        var price = parseFloat(closeStr);
-
-                        // Stooq returns "N/D" when the symbol is not found
-                        if (!closeStr || closeStr === "N/D" || isNaN(price) || price <= 0) {
+                    .then(function (text) {
+                        var result = a.parse(text, ticker);
+                        if (result && result.price > 0) {
+                            callback(result.name, result.price);
+                        } else {
                             tryNext(i + 1);
-                            return;
                         }
-
-                        // Name may contain commas — rejoin everything after index 8
-                        var name = cols.slice(8).join(",").trim() || ticker;
-
-                        callback(name, Math.round(price * 100) / 100);
                     })
                     .catch(function () { tryNext(i + 1); });
             }
 
             tryNext(0);
+        }
+
+        /* Parse price + name from Yahoo Finance page HTML.
+         * Yahoo embeds a large JSON object in the page that contains these keys. */
+        function parseYahooHtml(html, ticker) {
+            var priceMatch = html.match(/"regularMarketPrice"\s*:\s*\{\s*"raw"\s*:\s*([\d.]+)/);
+            if (!priceMatch) {
+                // Newer Yahoo page format stores it differently
+                priceMatch = html.match(/"regularMarketPrice":([\d.]+)/);
+            }
+            if (!priceMatch) return null;
+
+            var price = parseFloat(priceMatch[1]);
+            if (!price || price <= 0) return null;
+
+            var nameMatch = html.match(/"shortName"\s*:\s*"([^"]+)"/);
+            var name = nameMatch ? nameMatch[1] : ticker;
+
+            return { price: Math.round(price * 100) / 100, name: name };
+        }
+
+        /* Parse Close price from Stooq CSV.
+         * Format string "sd2t2ohlcv" → columns: Symbol(0) Date(1) Time(2) Open(3) High(4) Low(5) Close(6) Volume(7) */
+        function parseStooqCsv(csv, ticker) {
+            var lines = csv.trim().split(/\r?\n/);
+            if (lines.length < 2) return null;
+
+            var cols = lines[1].split(",");
+            var closeStr = (cols[6] || "").trim();
+            var price = parseFloat(closeStr);
+
+            if (!closeStr || closeStr === "N/D" || isNaN(price) || price <= 0) return null;
+
+            return { price: Math.round(price * 100) / 100, name: ticker };
         }
 
         function showLookupResult(ticker, name, price) {
