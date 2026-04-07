@@ -597,7 +597,7 @@ window.Portfolio = (function () {
         return getAllocationMap();
     }
 
-    /* --- Live stock price lookup (Yahoo Finance via CORS proxies, manual fallback) --- */
+    /* --- Live stock price lookup (Stooq CSV, manual fallback) --- */
     function initStockLookup() {
         var input = app.el("lookup-ticker-input");
         var btn = app.el("lookup-btn");
@@ -616,7 +616,7 @@ window.Portfolio = (function () {
             resultEl.innerHTML = '<span class="lookup-loading">Looking up ' + ticker + '&hellip;</span>';
             btn.disabled = true;
 
-            fetchYahooPrice(ticker, function (name, price) {
+            fetchStooqPrice(ticker, function (name, price) {
                 btn.disabled = false;
                 if (name && price) {
                     showLookupResult(ticker, name, price);
@@ -626,30 +626,48 @@ window.Portfolio = (function () {
             });
         }
 
-        /* Try two CORS proxies in sequence; calls back with (name, price) or (null, null) */
-        function fetchYahooPrice(ticker, callback) {
-            var yahooPath = "https://query2.finance.yahoo.com/v8/finance/chart/" +
-                encodeURIComponent(ticker) + "?interval=1d&range=1d";
+        /*
+         * Fetch price from Stooq.com CSV endpoint.
+         * Stooq uses a ".US" suffix for US-listed stocks (e.g. AAPL.US).
+         * CSV columns (format string sd2t2ohlcvn):
+         *   0=Symbol, 1=Date, 2=Time, 3=Open, 4=High, 5=Low, 6=Close, 7=Volume, 8=Name
+         * Falls back to allorigins proxy if the direct request is blocked by CORS.
+         */
+        function fetchStooqPrice(ticker, callback) {
+            var sym = (ticker.indexOf(".") === -1 ? ticker + ".US" : ticker).toLowerCase();
+            var csvUrl = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcvn&h&e=csv";
 
-            var proxies = [
-                "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooPath),
-                "https://corsproxy.io/?" + encodeURIComponent(yahooPath)
+            var urls = [
+                csvUrl,
+                "https://api.allorigins.win/raw?url=" + encodeURIComponent(csvUrl)
             ];
 
             function tryNext(i) {
-                if (i >= proxies.length) { callback(null, null); return; }
+                if (i >= urls.length) { callback(null, null); return; }
 
-                fetch(proxies[i])
+                fetch(urls[i])
                     .then(function (res) {
-                        if (!res.ok) throw new Error("status " + res.status);
-                        return res.json();
+                        if (!res.ok) throw new Error("HTTP " + res.status);
+                        return res.text();
                     })
-                    .then(function (json) {
-                        var result = json && json.chart && json.chart.result && json.chart.result[0];
-                        var meta = result && result.meta;
-                        var price = meta && meta.regularMarketPrice;
-                        if (!price || price <= 0) { tryNext(i + 1); return; }
-                        var name = meta.shortName || meta.longName || ticker;
+                    .then(function (csv) {
+                        var lines = csv.trim().split("\n");
+                        if (lines.length < 2) { tryNext(i + 1); return; }
+
+                        // Strip carriage returns and split on comma
+                        var cols = lines[1].replace(/\r/g, "").split(",");
+                        var closeStr = cols[6] && cols[6].trim();
+                        var price = parseFloat(closeStr);
+
+                        // Stooq returns "N/D" when the symbol is not found
+                        if (!closeStr || closeStr === "N/D" || isNaN(price) || price <= 0) {
+                            tryNext(i + 1);
+                            return;
+                        }
+
+                        // Name may contain commas — rejoin everything after index 8
+                        var name = cols.slice(8).join(",").trim() || ticker;
+
                         callback(name, Math.round(price * 100) / 100);
                     })
                     .catch(function () { tryNext(i + 1); });
