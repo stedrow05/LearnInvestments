@@ -613,6 +613,14 @@ window.Portfolio = (function () {
             var ticker = input.value.trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
             if (!ticker) return;
 
+            if (window.location.protocol === "file:") {
+                resultEl.style.display = "block";
+                resultEl.innerHTML = '<div class="lookup-error">Live prices require an HTTP server. ' +
+                    'Run <code>python -m http.server 8000</code> in the project folder, ' +
+                    'then open <strong>http://localhost:8000</strong>.</div>';
+                return;
+            }
+
             resultEl.style.display = "block";
             resultEl.innerHTML = '<span class="lookup-loading">Looking up ' + ticker + '&hellip;</span>';
             btn.disabled = true;
@@ -787,6 +795,13 @@ window.Portfolio = (function () {
 
     /* --- Refresh live prices for all 12 preset stocks on load --- */
     function refreshAllPrices() {
+        // file:// origin causes all CORS proxies to reject requests.
+        // The app must be served via HTTP (e.g. python -m http.server 8000).
+        if (window.location.protocol === "file:") {
+            setPriceStatus("Sample prices shown &mdash; serve via HTTP for live prices");
+            return;
+        }
+
         var stocks = data.stocks;
         var pending = stocks.length;
         var updated = 0;
