@@ -52,6 +52,16 @@
                                 <button class="filter-btn active" data-sector="all">All</button>
                             </div>
                         </div>
+                        <div class="stock-lookup-bar" id="stock-lookup-bar">
+                            <div class="lookup-form-row">
+                                <input type="text" id="lookup-ticker-input" class="lookup-ticker-input"
+                                    placeholder="Add any stock ticker (e.g. NVDA, AMD, VOO)"
+                                    maxlength="12" autocomplete="off" spellcheck="false">
+                                <button class="btn btn-secondary btn-sm" id="lookup-btn">Look Up Live Price</button>
+                            </div>
+                            <div id="lookup-result" style="display:none"></div>
+                        </div>
+
                         <div class="stock-grid" id="stock-grid">
                             <!-- Rendered by portfolio.js -->
                         </div>

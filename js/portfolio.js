@@ -13,12 +13,14 @@ window.Portfolio = (function () {
         renderOtherInvestments();
         updateSummary();
         initModal();
+        initStockLookup();
     }
 
     /* --- Sector filter buttons --- */
     function renderSectorFilters() {
         var sectors = [];
-        data.stocks.forEach(function (s) {
+        var allStocks = data.stocks.concat(data.customStocks || []);
+        allStocks.forEach(function (s) {
             if (sectors.indexOf(s.sector) === -1) sectors.push(s.sector);
         });
 
@@ -46,7 +48,8 @@ window.Portfolio = (function () {
     /* --- Stock cards grid --- */
     function renderStockGrid() {
         var container = app.el("stock-grid");
-        var filtered = data.stocks.filter(function (s) {
+        var allStocks = data.stocks.concat(data.customStocks || []);
+        var filtered = allStocks.filter(function (s) {
             return activeSectorFilter === "all" || s.sector === activeSectorFilter;
         });
 
@@ -58,7 +61,9 @@ window.Portfolio = (function () {
             return '<div class="stock-card" data-ticker="' + stock.ticker + '" style="border-top-color:' + stock.sectorColor + '">' +
                 '<div class="stock-card-top">' +
                     '<div class="stock-card-header">' +
-                        '<div class="stock-ticker">' + stock.ticker + '</div>' +
+                        '<div class="stock-ticker">' + stock.ticker +
+                            (stock.isCustom ? ' <span class="live-badge">Live</span>' : '') +
+                        '</div>' +
                         '<div class="stock-name">' + stock.name + '</div>' +
                     '</div>' +
                     '<div class="stock-price">' + app.formatCurrency(stock.price) + '<span class="price-label">/share</span></div>' +
@@ -590,6 +595,129 @@ window.Portfolio = (function () {
 
     function getAllocMap() {
         return getAllocationMap();
+    }
+
+    /* --- Live stock price lookup (Yahoo Finance via CORS proxy) --- */
+    function initStockLookup() {
+        var input = app.el("lookup-ticker-input");
+        var btn = app.el("lookup-btn");
+        var resultEl = app.el("lookup-result");
+
+        btn.addEventListener("click", doLookup);
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") doLookup();
+        });
+
+        function doLookup() {
+            var ticker = input.value.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
+            if (!ticker) return;
+
+            resultEl.style.display = "block";
+            resultEl.innerHTML = '<span class="lookup-loading">Looking up ' + ticker + '&hellip;</span>';
+            btn.disabled = true;
+
+            var yahooUrl = "https://query1.finance.yahoo.com/v8/finance/chart/" +
+                encodeURIComponent(ticker) + "?interval=1d&range=1d";
+            var proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(yahooUrl);
+
+            fetch(proxyUrl)
+                .then(function (res) {
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.json();
+                })
+                .then(function (json) {
+                    btn.disabled = false;
+                    var result = json && json.chart && json.chart.result && json.chart.result[0];
+                    if (!result || !result.meta) throw new Error("not_found");
+                    var meta = result.meta;
+                    var price = meta.regularMarketPrice;
+                    var name = meta.shortName || meta.longName || ticker;
+                    if (!price || price <= 0) throw new Error("not_found");
+                    showLookupResult(ticker, name, Math.round(price * 100) / 100);
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    resultEl.innerHTML =
+                        '<div class="lookup-error">' +
+                            'Could not find "' + ticker + '". Check the ticker symbol and try again. ' +
+                            '<span class="lookup-error-note">(Live prices require an internet connection)</span>' +
+                        '</div>';
+                });
+        }
+
+        function showLookupResult(ticker, name, price) {
+            var preset = null;
+            var stocks = data.stocks;
+            for (var i = 0; i < stocks.length; i++) {
+                if (stocks[i].ticker === ticker) { preset = stocks[i]; break; }
+            }
+
+            if (preset) {
+                resultEl.innerHTML =
+                    '<div class="lookup-already-exists">' +
+                        '<strong>' + ticker + '</strong> is already in the marketplace above at ' +
+                        app.formatCurrency(preset.price) + '/share. ' +
+                        '<span class="lookup-live-note">Live price: ' + app.formatCurrency(price) + '</span>' +
+                    '</div>';
+                return;
+            }
+
+            // Check if already added as custom
+            var custom = data.customStocks;
+            for (var j = 0; j < custom.length; j++) {
+                if (custom[j].ticker === ticker) {
+                    // Update the price
+                    custom[j].price = price;
+                    custom[j].name = name;
+                    resultEl.innerHTML =
+                        '<div class="lookup-already-exists">' +
+                            '<strong>' + ticker + '</strong> is already in your marketplace — price updated to ' +
+                            app.formatCurrency(price) + '/share.' +
+                        '</div>';
+                    renderStockGrid();
+                    updateSummary();
+                    return;
+                }
+            }
+
+            resultEl.innerHTML =
+                '<div class="lookup-found-card">' +
+                    '<div class="lookup-found-info">' +
+                        '<span class="lookup-found-ticker">' + ticker + '</span>' +
+                        '<span class="lookup-found-name">' + name + '</span>' +
+                        '<span class="lookup-found-price">' + app.formatCurrency(price) + ' / share</span>' +
+                        '<span class="live-badge">Live</span>' +
+                    '</div>' +
+                    '<button class="btn btn-primary btn-sm" id="lookup-add-btn">+ Add to Marketplace</button>' +
+                '</div>';
+
+            app.el("lookup-add-btn").addEventListener("click", function () {
+                addCustomStock(ticker, name, price);
+                resultEl.style.display = "none";
+                input.value = "";
+            });
+        }
+    }
+
+    function addCustomStock(ticker, name, price) {
+        data.customStocks.push({
+            ticker: ticker,
+            name: name,
+            price: price,
+            sector: "Custom",
+            sectorColor: "#607D8B",
+            riskLevel: 3,
+            typicalReturn: { min: -25, max: 35, average: 10 },
+            dividend: 0,
+            description: name + " — added with a live market price. The simulator uses default return estimates for custom stocks.",
+            whyBuy: ["You added this stock to explore it in the simulator."],
+            risks: ["Custom stocks use generic return assumptions. Real-world performance will differ."],
+            guidance: "This stock was added using live market data. Since we don't have detailed analysis, the simulation uses broad market averages as a stand-in.",
+            isCustom: true
+        });
+        renderSectorFilters();
+        renderStockGrid();
+        updateSummary();
     }
 
     return {

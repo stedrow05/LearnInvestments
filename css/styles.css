@@ -1552,6 +1552,126 @@ a {
     font-weight: 700;
 }
 
+/* ===== Stock Lookup Bar ===== */
+.stock-lookup-bar {
+    margin-bottom: 1rem;
+}
+
+.lookup-form-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.lookup-ticker-input {
+    flex: 1;
+    max-width: 340px;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family);
+    background: var(--color-surface);
+    color: var(--color-text);
+    transition: border-color var(--transition);
+    text-transform: uppercase;
+}
+
+.lookup-ticker-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.lookup-ticker-input::placeholder {
+    text-transform: none;
+    color: var(--color-text-muted);
+}
+
+#lookup-result {
+    margin-top: 0.6rem;
+}
+
+.lookup-loading {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.lookup-error {
+    font-size: var(--font-size-sm);
+    color: var(--color-danger);
+    padding: 0.5rem 0.75rem;
+    background: #fff5f5;
+    border-radius: var(--radius-sm);
+    border: 1px solid #ffd0d0;
+}
+
+.lookup-error-note {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.lookup-already-exists {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    padding: 0.5rem 0.75rem;
+    background: var(--color-primary-light);
+    border-radius: var(--radius-sm);
+}
+
+.lookup-live-note {
+    color: var(--color-success);
+    font-weight: 500;
+}
+
+.lookup-found-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+.lookup-found-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.lookup-found-ticker {
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.lookup-found-name {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.lookup-found-price {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+/* Live price badge (used in lookup result and stock cards) */
+.live-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--color-success);
+    color: white;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+}
+
 /* ===== Footer ===== */
 .app-footer {
     max-width: 1200px;

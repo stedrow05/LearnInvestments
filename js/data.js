@@ -636,5 +636,8 @@ window.AppData = {
     benchmarks: {
         conservative: { bonds: 40, etfs: 40, savings: 20, stockRisk: 2 },
         aggressive: { bonds: 5, etfs: 30, savings: 5, stockRisk: 4.5 }
-    }
+    },
+
+    /* Custom stocks added by the user via live price lookup */
+    customStocks: []
 };

@@ -63,6 +63,10 @@ window.App = (function () {
         for (var i = 0; i < stocks.length; i++) {
             if (stocks[i].ticker === ticker) return stocks[i];
         }
+        var custom = window.AppData.customStocks;
+        for (var j = 0; j < custom.length; j++) {
+            if (custom[j].ticker === ticker) return custom[j];
+        }
         return null;
     }
 
