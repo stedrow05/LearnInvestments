@@ -6,6 +6,14 @@ window.Portfolio = (function () {
     var app;
     var activeSectorFilter = "all";
 
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
     function init() {
         app = window.App;
         renderSectorFilters();
@@ -57,7 +65,6 @@ window.Portfolio = (function () {
         container.innerHTML = filtered.map(function (stock) {
             var held = app.state.stockHoldings[stock.ticker] || 0;
             var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
-            var maxBuyable = Math.floor(app.getRemaining() / stock.price) + held;
 
             return '<div class="stock-card" data-ticker="' + stock.ticker + '" style="border-top-color:' + stock.sectorColor + '">' +
                 '<div class="stock-card-top">' +
@@ -657,7 +664,7 @@ window.Portfolio = (function () {
                     custom[j].name = name;
                     resultEl.innerHTML =
                         '<div class="lookup-already-exists">' +
-                            '<strong>' + ticker + '</strong> already in your marketplace — price updated to ' +
+                            '<strong>' + escHtml(ticker) + '</strong> already in your marketplace — price updated to ' +
                             app.formatCurrency(price) + '/share.' +
                         '</div>';
                     renderStockGrid();
@@ -669,19 +676,20 @@ window.Portfolio = (function () {
             resultEl.innerHTML =
                 '<div class="lookup-found-card">' +
                     '<div class="lookup-found-info">' +
-                        '<span class="lookup-found-ticker">' + ticker + '</span>' +
-                        '<span class="lookup-found-name">' + name + '</span>' +
+                        '<span class="lookup-found-ticker">' + escHtml(ticker) + '</span>' +
+                        '<span class="lookup-found-name">' + escHtml(name) + '</span>' +
                         '<span class="lookup-found-price">' + app.formatCurrency(price) + '/share</span>' +
                         '<span class="live-badge">Live</span>' +
                     '</div>' +
                     '<button class="btn btn-primary btn-sm" id="lookup-add-btn">+ Add to Marketplace</button>' +
                 '</div>';
 
-            app.el("lookup-add-btn").addEventListener("click", function () {
+            // Use onclick assignment to avoid stale-closure listener accumulation
+            app.el("lookup-add-btn").onclick = function () {
                 addCustomStock(ticker, name, price);
                 resultEl.style.display = "none";
                 input.value = "";
-            });
+            };
         }
 
         function showManualEntry(ticker) {
@@ -740,8 +748,11 @@ window.Portfolio = (function () {
         function tryNext(i) {
             if (i >= attempts.length) { callback(null, null); return; }
             var a = attempts[i];
-            fetch(a.url)
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function () { controller.abort(); }, 8000);
+            fetch(a.url, { signal: controller.signal })
                 .then(function (res) {
+                    clearTimeout(timeoutId);
                     if (!res.ok) throw new Error("HTTP " + res.status);
                     return res.text();
                 })
@@ -753,7 +764,10 @@ window.Portfolio = (function () {
                         tryNext(i + 1);
                     }
                 })
-                .catch(function () { tryNext(i + 1); });
+                .catch(function () {
+                    clearTimeout(timeoutId);
+                    tryNext(i + 1);
+                });
         }
 
         tryNext(0);
@@ -814,11 +828,11 @@ window.Portfolio = (function () {
                 if (price && price > 0) {
                     stock.price = price;
                     updated++;
-                    renderStockGrid();
-                    updateSummary();
                 }
                 if (pending === 0) {
                     if (updated > 0) {
+                        renderStockGrid();
+                        updateSummary();
                         var now = new Date();
                         var t = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                         setPriceStatus("Live prices &mdash; updated " + t);
@@ -845,7 +859,7 @@ window.Portfolio = (function () {
             riskLevel: 3,
             typicalReturn: { min: -25, max: 35, average: 10 },
             dividend: 0,
-            description: name + " — added with a live market price. The simulator uses default return estimates for custom stocks.",
+            description: escHtml(name) + " — added with a live market price. The simulator uses default return estimates for custom stocks.",
             whyBuy: ["You added this stock to explore it in the simulator."],
             risks: ["Custom stocks use generic return assumptions. Real-world performance will differ."],
             guidance: "This stock was added using live market data. Since we don't have detailed analysis, the simulation uses broad market averages as a stand-in.",
