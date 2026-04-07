@@ -1659,6 +1659,51 @@ a {
     color: var(--color-primary);
 }
 
+.lookup-manual {
+    padding: 0.75rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.lookup-manual-note {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: 0.6rem;
+}
+
+.lookup-manual-fields {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.lookup-manual-input {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family);
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+.lookup-manual-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.lookup-manual-price-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.lookup-manual-price {
+    width: 120px;
+}
+
 /* Live price badge (used in lookup result and stock cards) */
 .live-badge {
     display: inline-block;

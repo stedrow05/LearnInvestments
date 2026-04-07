@@ -597,7 +597,7 @@ window.Portfolio = (function () {
         return getAllocationMap();
     }
 
-    /* --- Live stock price lookup (Yahoo Finance via CORS proxy) --- */
+    /* --- Live stock price lookup (Yahoo Finance via CORS proxies, manual fallback) --- */
     function initStockLookup() {
         var input = app.el("lookup-ticker-input");
         var btn = app.el("lookup-btn");
@@ -609,69 +609,79 @@ window.Portfolio = (function () {
         });
 
         function doLookup() {
-            var ticker = input.value.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
+            var ticker = input.value.trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
             if (!ticker) return;
 
             resultEl.style.display = "block";
             resultEl.innerHTML = '<span class="lookup-loading">Looking up ' + ticker + '&hellip;</span>';
             btn.disabled = true;
 
-            var yahooUrl = "https://query1.finance.yahoo.com/v8/finance/chart/" +
-                encodeURIComponent(ticker) + "?interval=1d&range=1d";
-            var proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(yahooUrl);
+            fetchYahooPrice(ticker, function (name, price) {
+                btn.disabled = false;
+                if (name && price) {
+                    showLookupResult(ticker, name, price);
+                } else {
+                    showManualEntry(ticker);
+                }
+            });
+        }
 
-            fetch(proxyUrl)
-                .then(function (res) {
-                    if (!res.ok) throw new Error("HTTP " + res.status);
-                    return res.json();
-                })
-                .then(function (json) {
-                    btn.disabled = false;
-                    var result = json && json.chart && json.chart.result && json.chart.result[0];
-                    if (!result || !result.meta) throw new Error("not_found");
-                    var meta = result.meta;
-                    var price = meta.regularMarketPrice;
-                    var name = meta.shortName || meta.longName || ticker;
-                    if (!price || price <= 0) throw new Error("not_found");
-                    showLookupResult(ticker, name, Math.round(price * 100) / 100);
-                })
-                .catch(function (err) {
-                    btn.disabled = false;
-                    resultEl.innerHTML =
-                        '<div class="lookup-error">' +
-                            'Could not find "' + ticker + '". Check the ticker symbol and try again. ' +
-                            '<span class="lookup-error-note">(Live prices require an internet connection)</span>' +
-                        '</div>';
-                });
+        /* Try two CORS proxies in sequence; calls back with (name, price) or (null, null) */
+        function fetchYahooPrice(ticker, callback) {
+            var yahooPath = "https://query2.finance.yahoo.com/v8/finance/chart/" +
+                encodeURIComponent(ticker) + "?interval=1d&range=1d";
+
+            var proxies = [
+                "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooPath),
+                "https://corsproxy.io/?" + encodeURIComponent(yahooPath)
+            ];
+
+            function tryNext(i) {
+                if (i >= proxies.length) { callback(null, null); return; }
+
+                fetch(proxies[i])
+                    .then(function (res) {
+                        if (!res.ok) throw new Error("status " + res.status);
+                        return res.json();
+                    })
+                    .then(function (json) {
+                        var result = json && json.chart && json.chart.result && json.chart.result[0];
+                        var meta = result && result.meta;
+                        var price = meta && meta.regularMarketPrice;
+                        if (!price || price <= 0) { tryNext(i + 1); return; }
+                        var name = meta.shortName || meta.longName || ticker;
+                        callback(name, Math.round(price * 100) / 100);
+                    })
+                    .catch(function () { tryNext(i + 1); });
+            }
+
+            tryNext(0);
         }
 
         function showLookupResult(ticker, name, price) {
-            var preset = null;
+            // Already in preset stocks?
             var stocks = data.stocks;
             for (var i = 0; i < stocks.length; i++) {
-                if (stocks[i].ticker === ticker) { preset = stocks[i]; break; }
+                if (stocks[i].ticker === ticker) {
+                    resultEl.innerHTML =
+                        '<div class="lookup-already-exists">' +
+                            '<strong>' + ticker + '</strong> is already in the marketplace above at ' +
+                            app.formatCurrency(stocks[i].price) + '/share.' +
+                            ' <span class="lookup-live-note">Live: ' + app.formatCurrency(price) + '</span>' +
+                        '</div>';
+                    return;
+                }
             }
 
-            if (preset) {
-                resultEl.innerHTML =
-                    '<div class="lookup-already-exists">' +
-                        '<strong>' + ticker + '</strong> is already in the marketplace above at ' +
-                        app.formatCurrency(preset.price) + '/share. ' +
-                        '<span class="lookup-live-note">Live price: ' + app.formatCurrency(price) + '</span>' +
-                    '</div>';
-                return;
-            }
-
-            // Check if already added as custom
+            // Already added as custom? Update price.
             var custom = data.customStocks;
             for (var j = 0; j < custom.length; j++) {
                 if (custom[j].ticker === ticker) {
-                    // Update the price
                     custom[j].price = price;
                     custom[j].name = name;
                     resultEl.innerHTML =
                         '<div class="lookup-already-exists">' +
-                            '<strong>' + ticker + '</strong> is already in your marketplace — price updated to ' +
+                            '<strong>' + ticker + '</strong> already in your marketplace — price updated to ' +
                             app.formatCurrency(price) + '/share.' +
                         '</div>';
                     renderStockGrid();
@@ -685,13 +695,43 @@ window.Portfolio = (function () {
                     '<div class="lookup-found-info">' +
                         '<span class="lookup-found-ticker">' + ticker + '</span>' +
                         '<span class="lookup-found-name">' + name + '</span>' +
-                        '<span class="lookup-found-price">' + app.formatCurrency(price) + ' / share</span>' +
+                        '<span class="lookup-found-price">' + app.formatCurrency(price) + '/share</span>' +
                         '<span class="live-badge">Live</span>' +
                     '</div>' +
                     '<button class="btn btn-primary btn-sm" id="lookup-add-btn">+ Add to Marketplace</button>' +
                 '</div>';
 
             app.el("lookup-add-btn").addEventListener("click", function () {
+                addCustomStock(ticker, name, price);
+                resultEl.style.display = "none";
+                input.value = "";
+            });
+        }
+
+        /* Shown when all proxies fail — lets user enter price manually */
+        function showManualEntry(ticker) {
+            resultEl.innerHTML =
+                '<div class="lookup-manual">' +
+                    '<p class="lookup-manual-note">Live price unavailable for <strong>' + ticker + '</strong>. Enter details manually:</p>' +
+                    '<div class="lookup-manual-fields">' +
+                        '<input type="text" id="lookup-manual-name" class="lookup-manual-input" ' +
+                            'placeholder="Company name" value="' + ticker + '">' +
+                        '<div class="lookup-manual-price-row">' +
+                            '<span class="dollar-sign">$</span>' +
+                            '<input type="number" id="lookup-manual-price" class="lookup-manual-input lookup-manual-price" ' +
+                                'placeholder="Price per share" min="0.01" step="0.01">' +
+                        '</div>' +
+                        '<button class="btn btn-primary btn-sm" id="lookup-manual-add-btn">+ Add to Marketplace</button>' +
+                    '</div>' +
+                '</div>';
+
+            app.el("lookup-manual-add-btn").addEventListener("click", function () {
+                var name = app.el("lookup-manual-name").value.trim() || ticker;
+                var price = parseFloat(app.el("lookup-manual-price").value);
+                if (!price || price <= 0) {
+                    app.el("lookup-manual-price").style.borderColor = "var(--color-danger)";
+                    return;
+                }
                 addCustomStock(ticker, name, price);
                 resultEl.style.display = "none";
                 input.value = "";
