@@ -708,21 +708,25 @@ window.Portfolio = (function () {
 
     /* --- Shared price fetching (used by lookup + refreshAllPrices) ---
      *
-     * Strategy order:
-     *  1. Scrape finance.yahoo.com/quote/{TICKER} via allorigins proxy —
-     *     Yahoo embeds regularMarketPrice + shortName as JSON in every page.
-     *  2. Stooq CSV via allorigins proxy — columns: Symbol,Date,Time,O,H,L,Close,Vol
-     *  3. Stooq CSV direct (in case the proxy isn't needed)
+     * Attempts in order (first success wins):
+     *  1. Yahoo Finance JSON chart API via allorigins proxy
+     *  2. Yahoo Finance JSON chart API via corsproxy.io
+     *  3. Yahoo Finance page HTML via allorigins proxy (scrape embedded JSON)
+     *  4. Stooq CSV via allorigins proxy
+     *  5. Stooq CSV direct request
      */
     function fetchLivePrice(ticker, callback) {
-        var sym = (ticker.indexOf(".") === -1 ? ticker + ".US" : ticker).toLowerCase();
-        var yahooPage = "https://finance.yahoo.com/quote/" + encodeURIComponent(ticker) + "/";
-        var stooqCsv  = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcv&h&e=csv";
+        var sym        = (ticker.indexOf(".") === -1 ? ticker + ".US" : ticker).toLowerCase();
+        var yahooChart = "https://query2.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(ticker) + "?range=1d&interval=1d";
+        var yahooPage  = "https://finance.yahoo.com/quote/" + encodeURIComponent(ticker) + "/";
+        var stooqCsv   = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcv&h&e=csv";
 
         var attempts = [
-            { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooPage), parse: parseYahooHtml },
-            { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(stooqCsv),  parse: parseStooqCsv  },
-            { url: stooqCsv,                                                               parse: parseStooqCsv  }
+            { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooChart), parse: parseYahooJson },
+            { url: "https://corsproxy.io/?"              + encodeURIComponent(yahooChart), parse: parseYahooJson },
+            { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yahooPage),  parse: parseYahooHtml },
+            { url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(stooqCsv),   parse: parseStooqCsv  },
+            { url: stooqCsv,                                                                parse: parseStooqCsv  }
         ];
 
         function tryNext(i) {
@@ -747,24 +751,36 @@ window.Portfolio = (function () {
         tryNext(0);
     }
 
-    function parseYahooHtml(html, ticker) {
-        var priceMatch = html.match(/"regularMarketPrice"\s*:\s*\{\s*"raw"\s*:\s*([\d.]+)/);
-        if (!priceMatch) priceMatch = html.match(/"regularMarketPrice":([\d.]+)/);
-        if (!priceMatch) return null;
-
-        var price = parseFloat(priceMatch[1]);
-        if (!price || price <= 0) return null;
-
-        var nameMatch = html.match(/"shortName"\s*:\s*"([^"]+)"/);
-        return { price: Math.round(price * 100) / 100, name: nameMatch ? nameMatch[1] : ticker };
+    /* Yahoo Finance chart API JSON: chart.result[0].meta.regularMarketPrice */
+    function parseYahooJson(text, ticker) {
+        try {
+            var json   = JSON.parse(text);
+            var meta   = json && json.chart && json.chart.result && json.chart.result[0] && json.chart.result[0].meta;
+            var price  = meta && meta.regularMarketPrice;
+            if (!price || price <= 0) return null;
+            var name = (meta.shortName || meta.longName || ticker);
+            return { price: Math.round(price * 100) / 100, name: name };
+        } catch (e) { return null; }
     }
 
+    /* Yahoo Finance page HTML: scrape the JSON blob Yahoo embeds server-side */
+    function parseYahooHtml(html, ticker) {
+        var m = html.match(/"regularMarketPrice"\s*:\s*\{\s*"raw"\s*:\s*([\d.]+)/);
+        if (!m) m = html.match(/"regularMarketPrice":([\d.]+)/);
+        if (!m) return null;
+        var price = parseFloat(m[1]);
+        if (!price || price <= 0) return null;
+        var nm = html.match(/"shortName"\s*:\s*"([^"]+)"/);
+        return { price: Math.round(price * 100) / 100, name: nm ? nm[1] : ticker };
+    }
+
+    /* Stooq CSV: Symbol,Date,Time,Open,High,Low,Close,Volume → Close at col 6 */
     function parseStooqCsv(csv, ticker) {
         var lines = csv.trim().split(/\r?\n/);
         if (lines.length < 2) return null;
-        var cols = lines[1].split(",");
+        var cols     = lines[1].split(",");
         var closeStr = (cols[6] || "").trim();
-        var price = parseFloat(closeStr);
+        var price    = parseFloat(closeStr);
         if (!closeStr || closeStr === "N/D" || isNaN(price) || price <= 0) return null;
         return { price: Math.round(price * 100) / 100, name: ticker };
     }
