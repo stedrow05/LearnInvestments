@@ -751,7 +751,11 @@ window.Portfolio = (function () {
         ];
 
         function tryNext(i) {
-            if (i >= attempts.length) { callback(null, null); return; }
+            if (i >= attempts.length) {
+                console.warn("[LivePrice] All sources failed for " + ticker);
+                callback(null, null);
+                return;
+            }
             var a = attempts[i];
             var controller = new AbortController();
             var timeoutId = setTimeout(function () { controller.abort(); }, 8000);
@@ -766,11 +770,13 @@ window.Portfolio = (function () {
                     if (result && result.price > 0) {
                         callback(result.name, result.price);
                     } else {
+                        console.warn("[LivePrice] " + ticker + " attempt " + (i + 1) + " returned no price");
                         tryNext(i + 1);
                     }
                 })
-                .catch(function () {
+                .catch(function (err) {
                     clearTimeout(timeoutId);
+                    console.warn("[LivePrice] " + ticker + " attempt " + (i + 1) + " failed:", err && err.message);
                     tryNext(i + 1);
                 });
         }
@@ -868,7 +874,9 @@ window.Portfolio = (function () {
         var btn = app.el("refresh-prices-btn");
         if (!btn) return;
         btn.disabled = loading;
-        btn.innerHTML = loading ? "&#8635; Refreshing&hellip;" : "&#8635; Refresh Prices";
+        btn.innerHTML = loading
+            ? '<span class="spin-icon">&#8635;</span> Refreshing&hellip;'
+            : '&#8635; Refresh Prices';
     }
 
     function addCustomStock(ticker, name, price) {
