@@ -847,6 +847,7 @@ window.Portfolio = (function () {
                     if (updated > 0) {
                         renderStockGrid();
                         updateSummary();
+                        if (window.Education) window.Education.renderCompanies();
                         var now = new Date();
                         var t = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                         setPriceStatus("Live prices &mdash; updated " + t);
