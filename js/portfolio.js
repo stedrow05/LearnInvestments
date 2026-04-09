@@ -23,6 +23,11 @@ window.Portfolio = (function () {
         initModal();
         initStockLookup();
         refreshAllPrices();
+
+        var refreshBtn = app.el("refresh-prices-btn");
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", refreshAllPrices);
+        }
     }
 
     /* --- Sector filter buttons --- */
@@ -808,13 +813,20 @@ window.Portfolio = (function () {
     }
 
     /* --- Refresh live prices for all 12 preset stocks on load --- */
+    var refreshing = false;
+
     function refreshAllPrices() {
+        if (refreshing) return;
+
         // file:// origin causes all CORS proxies to reject requests.
         // The app must be served via HTTP (e.g. python -m http.server 8000).
         if (window.location.protocol === "file:") {
             setPriceStatus("Sample prices shown &mdash; serve via HTTP for live prices");
             return;
         }
+
+        refreshing = true;
+        setRefreshBtnState(true);
 
         var stocks = data.stocks;
         var pending = stocks.length;
@@ -830,6 +842,8 @@ window.Portfolio = (function () {
                     updated++;
                 }
                 if (pending === 0) {
+                    refreshing = false;
+                    setRefreshBtnState(false);
                     if (updated > 0) {
                         renderStockGrid();
                         updateSummary();
@@ -847,6 +861,13 @@ window.Portfolio = (function () {
     function setPriceStatus(msg) {
         var el = app.el("price-status");
         if (el) el.innerHTML = msg;
+    }
+
+    function setRefreshBtnState(loading) {
+        var btn = app.el("refresh-prices-btn");
+        if (!btn) return;
+        btn.disabled = loading;
+        btn.innerHTML = loading ? "&#8635; Refreshing&hellip;" : "&#8635; Refresh Prices";
     }
 
     function addCustomStock(ticker, name, price) {
