@@ -889,6 +889,7 @@ window.Portfolio = (function () {
         renderSectorFilters();
         renderStockGrid();
         updateSummary();
+        if (window.Education) window.Education.renderCompanies();
     }
 
     return {

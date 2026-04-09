@@ -799,6 +799,17 @@ a {
     font-size: 1.5rem;
 }
 
+.meta-tag-custom {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 100px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    background: #e8f4fd;
+    color: #1a6fa8;
+    border: 1px solid #b3d7f0;
+}
+
 .accordion-arrow {
     margin-left: auto;
     font-size: var(--font-size-sm);

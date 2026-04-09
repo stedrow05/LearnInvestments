@@ -19,14 +19,19 @@ window.Education = (function () {
         var container = app.el("company-accordion");
         if (!container) return;
 
-        container.innerHTML = data.stocks.map(function (stock) {
-            var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
+        var allStocks = data.stocks.concat(data.customStocks || []);
+        var riskLabels = ["", "Very Low", "Low", "Moderate", "High", "Very High"];
+
+        container.innerHTML = allStocks.map(function (stock) {
+            var customBadge = stock.isCustom
+                ? '<span class="meta-tag meta-tag-custom" style="margin-left:auto;margin-right:0.5rem;">Custom</span>'
+                : '<span class="meta-tag" style="margin-left:auto;margin-right:0.5rem;">' + stock.sector + '</span>';
 
             return '<div class="accordion-item">' +
                 '<button class="accordion-header" aria-expanded="false">' +
                     '<span class="accordion-icon" style="font-size:1rem;font-weight:700;color:' + stock.sectorColor + '">' + stock.ticker + '</span>' +
                     '<span>' + stock.name + '</span>' +
-                    '<span class="meta-tag" style="margin-left:auto;margin-right:0.5rem;">' + stock.sector + '</span>' +
+                    customBadge +
                     '<span class="accordion-arrow">\u25BC</span>' +
                 '</button>' +
                 '<div class="accordion-body">' +
@@ -167,5 +172,5 @@ window.Education = (function () {
         }).join("");
     }
 
-    return { init: init };
+    return { init: init, renderCompanies: renderCompanies };
 })();
