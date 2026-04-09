@@ -23,11 +23,6 @@ window.Portfolio = (function () {
         initModal();
         initStockLookup();
         refreshAllPrices();
-
-        var refreshBtn = app.el("refresh-prices-btn");
-        if (refreshBtn) {
-            refreshBtn.addEventListener("click", refreshAllPrices);
-        }
     }
 
     /* --- Sector filter buttons --- */
@@ -903,6 +898,7 @@ window.Portfolio = (function () {
 
     return {
         init: init,
+        refreshAllPrices: refreshAllPrices,
         setHoldings: setHoldings,
         getTotal: getTotal,
         getAllocMap: getAllocMap
