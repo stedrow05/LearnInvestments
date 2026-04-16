@@ -314,7 +314,7 @@ window.ImpactAnalyzer = (function () {
 
         /* Narrative */
         var pros           = buildPros(stock, before, after, addedValue, newTotal, annualDivInc, isNewHolding, correlated, isEmpty, sharesAdding);
-        var cons           = buildCons(stock, before, after, addedValue, newTotal, isDuplicate, correlated, pctOfPortfolio);
+        var cons           = buildCons(stock, before, after, addedValue, newTotal, isDuplicate, correlated, pctOfPortfolio, isEmpty);
         var recommendation = buildRecommendation(pros, cons, before, after, stock, isDuplicate, isEmpty);
         var summary        = buildSummary(stock, sharesAdding, addedValue, newTotal, before, after, isNewHolding, isEmpty);
 
@@ -571,7 +571,7 @@ window.ImpactAnalyzer = (function () {
         return pros;
     }
 
-    function buildCons(stock, before, after, addedValue, newTotal, isDuplicate, correlated, pctOfPortfolio) {
+    function buildCons(stock, before, after, addedValue, newTotal, isDuplicate, correlated, pctOfPortfolio, isEmpty) {
         var cons = [];
 
         // Sector over-concentration
