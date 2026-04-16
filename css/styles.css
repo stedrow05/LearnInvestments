@@ -1939,44 +1939,12 @@ a {
 .impact-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--color-border);
     background: var(--color-bg);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    position: sticky;
-    bottom: 0;
-}
-
-.impact-shares-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: var(--font-size-sm);
-}
-
-.impact-shares-label {
-    font-weight: 500;
-    color: var(--color-text-secondary);
-}
-
-.impact-shares-num {
-    min-width: 1.5rem;
-    text-align: center;
-    font-weight: 700;
-    font-size: var(--font-size-base);
-}
-
-.impact-shares-cost {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
-}
-
-.impact-footer-btns {
-    display: flex;
-    gap: 0.75rem;
 }
 
 /* ===== Info Tooltips ===== */

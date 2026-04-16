@@ -36,9 +36,8 @@ window.ImpactAnalyzer = (function () {
     "use strict";
 
     var app, data;
-    var pendingCallback = null;
-    var pendingTicker   = null;
-    var pendingShares   = 1;
+    var pendingTicker = null;
+    var pendingUndoFn = null;
 
     /* ----------------------------------------------------------------
      *  Initialization — called from App.init()
@@ -79,37 +78,44 @@ window.ImpactAnalyzer = (function () {
     /* ----------------------------------------------------------------
      *  Public API
      *
-     *  show(ticker, initialShares, callback)
-     *    callback(confirmed: bool, shares: int)
-     *    Called when user dismisses the modal.
+     *  showAfter(ticker, undoFn)
+     *    Call AFTER the purchase has already been executed.
+     *    undoFn() — called if the user clicks "Undo Purchase".
      * ---------------------------------------------------------------- */
-    function show(ticker, initialShares, callback) {
-        pendingTicker   = ticker;
-        pendingShares   = initialShares || 1;
-        pendingCallback = callback;
-        renderContent();
-        document.getElementById("impact-modal").style.display = "flex";
+    function showAfter(ticker, undoFn) {
+        pendingTicker = ticker;
+        pendingUndoFn = undoFn || null;
+        try {
+            renderContent();
+            document.getElementById("impact-modal").style.display = "flex";
+        } catch (err) {
+            console.error("[ImpactAnalyzer] Failed to render impact modal:", err);
+        }
     }
 
-    function dismiss(confirmed) {
+    function dismiss(undo) {
         document.getElementById("impact-modal").style.display = "none";
-        if (pendingCallback) {
-            var cb = pendingCallback;
-            pendingCallback = null;
-            cb(confirmed, confirmed ? pendingShares : 0);
+        if (undo && pendingUndoFn) {
+            var fn = pendingUndoFn;
+            pendingUndoFn = null;
+            fn();
+        } else {
+            pendingUndoFn = null;
         }
     }
 
     /* ----------------------------------------------------------------
-     *  Render modal content (re-called when share count changes)
+     *  Render modal content
+     *  Called after the purchase has already been added to state,
+     *  so "after" = current state, "before" = current minus one share.
      * ---------------------------------------------------------------- */
     function renderContent() {
         var stock = app.getStockByTicker(pendingTicker);
         if (!stock) return;
 
-        var analysis      = analyzeImpact(pendingTicker, pendingShares);
-        var maxAffordable = Math.max(1, Math.floor(app.getRemaining() / stock.price));
-        var box           = document.getElementById("impact-modal-content");
+        var analysis = analyzeImpact(pendingTicker);
+        var box      = document.getElementById("impact-modal-content");
+        if (!box) return;
 
         box.innerHTML =
             /* ── Header ───────────────────────────────── */
@@ -175,30 +181,14 @@ window.ImpactAnalyzer = (function () {
 
             /* ── Footer ───────────────────────────────── */
             '<div class="impact-footer">' +
-                '<div class="impact-shares-row">' +
-                    '<span class="impact-shares-label">Shares to add:</span>' +
-                    '<button class="share-btn minus" id="impact-dec" ' + (pendingShares <= 1 ? 'disabled' : '') + '>&minus;</button>' +
-                    '<span class="impact-shares-num" id="impact-shares-num">' + pendingShares + '</span>' +
-                    '<button class="share-btn plus"  id="impact-inc" ' + (pendingShares >= maxAffordable ? 'disabled' : '') + '>+</button>' +
-                    '<span class="impact-shares-cost">= ' + app.formatCurrency(pendingShares * stock.price) + '</span>' +
-                '</div>' +
-                '<div class="impact-footer-btns">' +
-                    '<button class="btn btn-secondary" id="impact-cancel">Cancel</button>' +
-                    '<button class="btn btn-primary"   id="impact-confirm">&#10003; Confirm Add</button>' +
-                '</div>' +
+                '<button class="btn btn-secondary" id="impact-undo">&#8630; Undo Purchase</button>' +
+                '<button class="btn btn-primary"   id="impact-gotit">Got it</button>' +
             '</div>';
 
         /* ── Wire events ── */
-        document.getElementById("impact-close-x").addEventListener("click",  function () { dismiss(false); });
-        document.getElementById("impact-cancel").addEventListener("click",   function () { dismiss(false); });
-        document.getElementById("impact-confirm").addEventListener("click",  function () { dismiss(true);  });
-
-        document.getElementById("impact-dec").addEventListener("click", function () {
-            if (pendingShares > 1) { pendingShares--; renderContent(); }
-        });
-        document.getElementById("impact-inc").addEventListener("click", function () {
-            if (pendingShares < maxAffordable) { pendingShares++; renderContent(); }
-        });
+        document.getElementById("impact-close-x").addEventListener("click", function () { dismiss(false); });
+        document.getElementById("impact-undo").addEventListener("click",    function () { dismiss(true);  });
+        document.getElementById("impact-gotit").addEventListener("click",   function () { dismiss(false); });
     }
 
     /* ----------------------------------------------------------------
@@ -260,63 +250,67 @@ window.ImpactAnalyzer = (function () {
      *  can operate on either real or simulated state without mutation.
      * ================================================================ */
 
-    /* --- Master function ------------------------------------------ */
-    function analyzeImpact(ticker, sharesAdding) {
+    /* --- Master function ------------------------------------------
+     *  The purchase has ALREADY been applied to app.state.
+     *  "after"  = current real state (includes the new share)
+     *  "before" = current state minus one share of ticker
+     * -------------------------------------------------------------- */
+    function analyzeImpact(ticker) {
         var stock      = app.getStockByTicker(ticker);
-        var addedValue = sharesAdding * stock.price;
+        var addedValue = stock.price; // always 1 share
 
-        /* Build simulated holdings (no real-state mutation) */
-        var simStocks = {};
-        for (var t in app.state.stockHoldings) simStocks[t] = app.state.stockHoldings[t];
-        simStocks[ticker] = (simStocks[ticker] || 0) + sharesAdding;
+        /* "After" = real current state */
+        var afterStocks = app.state.stockHoldings;
+        var afterOther  = app.state.otherHoldings;
+        var newTotal    = calcTotal(afterStocks, afterOther);
 
-        var simOther = {
-            bonds:   app.state.otherHoldings.bonds,
-            etfs:    app.state.otherHoldings.etfs,
-            savings: app.state.otherHoldings.savings
-        };
-
-        /* Current totals */
-        var curTotal  = calcTotal(app.state.stockHoldings, app.state.otherHoldings);
-        var newTotal  = curTotal + addedValue;
-        var isEmpty   = curTotal === 0;
-        var isNewHolding  = !app.state.stockHoldings[ticker];
-        var isDuplicate   = !!app.state.stockHoldings[ticker];
+        /* "Before" = remove the one share we just added */
+        var beforeStocks = {};
+        for (var t in afterStocks) beforeStocks[t] = afterStocks[t];
+        if (beforeStocks[ticker] > 1) {
+            beforeStocks[ticker]--;
+        } else {
+            delete beforeStocks[ticker];
+        }
+        var curTotal     = newTotal - addedValue;
+        var isEmpty      = curTotal <= 0;
+        var isNewHolding = (afterStocks[ticker] || 0) === 1; // had 0 before this buy
+        var isDuplicate  = (afterStocks[ticker] || 0) > 1;  // had >=1 before this buy
 
         /* Before metrics */
         var before = isEmpty
             ? { total: 0, diversity: 0, riskRaw: 0, riskLabel: "\u2014", expectedReturn: 0, volatility: 0, sectorPct: 0 }
             : {
                 total:          curTotal,
-                diversity:      calcDiversity(app.state.stockHoldings, app.state.otherHoldings),
-                riskRaw:        calcRisk(app.state.stockHoldings, app.state.otherHoldings),
-                riskLabel:      riskLabel(calcRisk(app.state.stockHoldings, app.state.otherHoldings)),
-                expectedReturn: calcReturn(app.state.stockHoldings, app.state.otherHoldings),
-                volatility:     calcVolatility(app.state.stockHoldings, app.state.otherHoldings),
-                sectorPct:      calcSectorPct(stock.sector, app.state.stockHoldings, curTotal)
+                diversity:      calcDiversity(beforeStocks, afterOther),
+                riskRaw:        calcRisk(beforeStocks, afterOther),
+                riskLabel:      riskLabel(calcRisk(beforeStocks, afterOther)),
+                expectedReturn: calcReturn(beforeStocks, afterOther),
+                volatility:     calcVolatility(beforeStocks, afterOther),
+                sectorPct:      calcSectorPct(stock.sector, beforeStocks, curTotal)
               };
 
         /* After metrics */
         var after = {
             total:          newTotal,
-            diversity:      calcDiversity(simStocks, simOther),
-            riskRaw:        calcRisk(simStocks, simOther),
-            riskLabel:      riskLabel(calcRisk(simStocks, simOther)),
-            expectedReturn: calcReturn(simStocks, simOther),
-            volatility:     calcVolatility(simStocks, simOther),
-            sectorPct:      calcSectorPct(stock.sector, simStocks, newTotal)
+            diversity:      calcDiversity(afterStocks, afterOther),
+            riskRaw:        calcRisk(afterStocks, afterOther),
+            riskLabel:      riskLabel(calcRisk(afterStocks, afterOther)),
+            expectedReturn: calcReturn(afterStocks, afterOther),
+            volatility:     calcVolatility(afterStocks, afterOther),
+            sectorPct:      calcSectorPct(stock.sector, afterStocks, newTotal)
         };
 
         /* Supporting facts */
-        var correlated    = findCorrelated(ticker, stock.sector);
-        var annualDivInc  = stock.dividend > 0 ? (addedValue * stock.dividend / 100) : 0;
+        var correlated     = findCorrelated(ticker, stock.sector);
+        var annualDivInc   = stock.dividend > 0 ? (addedValue * stock.dividend / 100) : 0;
         var pctOfPortfolio = (addedValue / newTotal) * 100;
 
         /* Narrative */
-        var pros           = buildPros(stock, before, after, addedValue, newTotal, annualDivInc, isNewHolding, correlated, isEmpty, sharesAdding);
+        var pros           = buildPros(stock, before, after, addedValue, newTotal, annualDivInc, isNewHolding, correlated, isEmpty, 1);
         var cons           = buildCons(stock, before, after, addedValue, newTotal, isDuplicate, correlated, pctOfPortfolio, isEmpty);
         var recommendation = buildRecommendation(pros, cons, before, after, stock, isDuplicate, isEmpty);
-        var summary        = buildSummary(stock, sharesAdding, addedValue, newTotal, before, after, isNewHolding, isEmpty);
+        var summary        = buildSummary(stock, 1, addedValue, newTotal, before, after, isNewHolding, isEmpty);
 
         return { before: before, after: after, pros: pros, cons: cons, recommendation: recommendation, summary: summary };
     }
@@ -681,7 +675,7 @@ window.ImpactAnalyzer = (function () {
      * ---------------------------------------------------------------- */
     return {
         init: init,
-        show: show
+        showAfter: showAfter
     };
 
 })();
