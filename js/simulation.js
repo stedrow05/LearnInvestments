@@ -239,6 +239,11 @@ window.Simulation = (function () {
 
     /* --- Display results --- */
     function displayResults(userP, consP, aggP, events, initialTotal) {
+        app.state.simulationRun = true;
+        app.state.simulationStale = false;
+        var staleBanner = app.el("sim-stale-banner");
+        if (staleBanner) staleBanner.style.display = "none";
+
         app.el("sim-no-data").style.display = "none";
         app.el("sim-results").style.display = "block";
 

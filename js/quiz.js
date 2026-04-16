@@ -132,6 +132,11 @@ window.Quiz = (function () {
             '</span>';
 
         app.el("apply-profile-btn").addEventListener("click", function () {
+            var hasStocks = Object.keys(app.state.stockHoldings).length > 0;
+            var hasOther = Object.keys(app.state.otherHoldings).some(function (k) {
+                return app.state.otherHoldings[k] > 0;
+            });
+            if ((hasStocks || hasOther) && !confirm("This will replace your current portfolio. Continue?")) return;
             window.Portfolio.setHoldings(suggested);
             app.switchTab("portfolio");
         });

@@ -34,6 +34,8 @@
                     <span class="budget-label">Your Budget</span>
                     <span class="budget-numbers">
                         <span id="budget-allocated">$0</span> of <span id="budget-total">$10,000</span> invested
+                        &nbsp;&middot;&nbsp;
+                        <button class="btn-link reset-portfolio-btn" id="reset-portfolio-btn" title="Clear all holdings and start fresh">Reset Portfolio</button>
                     </span>
                 </div>
                 <div class="budget-bar">
@@ -91,7 +93,7 @@
                     <div class="summary-card">
                         <h3>Portfolio Summary</h3>
                         <div class="summary-item">
-                            <div class="summary-label">Diversification Score</div>
+                            <div class="summary-label">Diversification Score <span class="info-icon" aria-label="About diversification score">ⓘ<span class="tooltip-text">How spread out your investments are across sectors. Higher is better. 100 = perfectly balanced.</span></span></div>
                             <div class="score-display">
                                 <span class="score-value" id="diversification-score">0</span>
                                 <span class="score-max">/ 100</span>
@@ -102,7 +104,7 @@
                         </div>
 
                         <div class="summary-item">
-                            <div class="summary-label">Risk Level</div>
+                            <div class="summary-label">Risk Level <span class="info-icon" aria-label="About risk level">ⓘ<span class="tooltip-text">Weighted average risk of your holdings. 1 = Very Low, 5 = Very High. Higher risk means bigger potential gains and losses.</span></span></div>
                             <div class="risk-gauge" id="risk-gauge">
                                 <div class="risk-level" id="risk-level">&mdash;</div>
                                 <div class="risk-dots">
@@ -153,6 +155,11 @@
                 <button class="btn btn-primary sim-run-btn" id="sim-run-btn">Run Simulation</button>
             </div>
 
+            <div id="sim-stale-banner" class="stale-banner" style="display:none;">
+                &#9888; Portfolio changed since last run &mdash; results may be outdated.
+                <button class="btn-link" onclick="document.getElementById('sim-run-btn').click()">Re-run simulation</button>
+            </div>
+
             <div class="sim-chart-container">
                 <canvas id="sim-chart"></canvas>
                 <div class="sim-no-data" id="sim-no-data">
@@ -180,6 +187,17 @@
                     <h3>Market Events</h3>
                     <div class="events-list" id="events-list"></div>
                 </div>
+
+                <details class="benchmark-explanation">
+                    <summary>About the chart benchmarks</summary>
+                    <p>The chart shows three lines alongside your portfolio:</p>
+                    <ul>
+                        <li><strong>Conservative benchmark:</strong> 60% bonds, 30% ETFs, 10% savings &mdash; a low-risk reference.</li>
+                        <li><strong>Aggressive benchmark:</strong> 100% high-risk stocks &mdash; a high-risk, high-reward reference.</li>
+                        <li><strong>Likely Range (shaded):</strong> The middle 80% of 100 simulated outcomes for your portfolio.</li>
+                    </ul>
+                    <p>These are internal reference points, not real market indices. Past performance does not guarantee future results.</p>
+                </details>
             </div>
         </section>
 
@@ -268,6 +286,9 @@
             <!-- Rendered by portfolio.js -->
         </div>
     </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
 
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>

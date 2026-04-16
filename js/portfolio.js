@@ -23,6 +23,18 @@ window.Portfolio = (function () {
         initModal();
         initStockLookup();
         refreshAllPrices();
+
+        var resetBtn = app.el("reset-portfolio-btn");
+        if (resetBtn) {
+            resetBtn.addEventListener("click", function () {
+                if (!confirm("Reset your portfolio? This will clear all holdings.")) return;
+                app.resetState();
+                renderSectorFilters();
+                renderStockGrid();
+                renderOtherInvestments();
+                updateSummary();
+            });
+        }
     }
 
     /* --- Sector filter buttons --- */
@@ -115,6 +127,26 @@ window.Portfolio = (function () {
         });
     }
 
+    /* --- Staleness + toast helpers --- */
+    function markSimulationStale() {
+        if (!app.state.simulationRun) return;
+        app.state.simulationStale = true;
+        var banner = app.el("sim-stale-banner");
+        if (banner) banner.style.display = "block";
+    }
+
+    var toastTimer = null;
+    function showToast(msg) {
+        var toast = app.el("toast");
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.add("toast-show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            toast.classList.remove("toast-show");
+        }, 2500);
+    }
+
     /* --- Buy / Sell shares --- */
     function buyShare(ticker) {
         var stock = app.getStockByTicker(ticker);
@@ -123,15 +155,20 @@ window.Portfolio = (function () {
         app.state.stockHoldings[ticker] = (app.state.stockHoldings[ticker] || 0) + 1;
         renderStockGrid();
         updateSummary();
+        markSimulationStale();
+        showToast("Bought 1 share of " + ticker + " for " + app.formatCurrency(stock.price));
     }
 
     function sellShare(ticker) {
         if (!app.state.stockHoldings[ticker] || app.state.stockHoldings[ticker] <= 0) return;
+        var stock = app.getStockByTicker(ticker);
 
         app.state.stockHoldings[ticker]--;
         if (app.state.stockHoldings[ticker] === 0) delete app.state.stockHoldings[ticker];
         renderStockGrid();
         updateSummary();
+        markSimulationStale();
+        if (stock) showToast("Sold 1 share of " + ticker);
     }
 
     /* --- Other investments (bonds, ETFs, savings) --- */
@@ -184,6 +221,7 @@ window.Portfolio = (function () {
                 input.value = v;
                 app.state.otherHoldings[inv.id] = v;
                 updateSummary();
+                markSimulationStale();
             });
 
             input.addEventListener("input", function () {
@@ -194,6 +232,7 @@ window.Portfolio = (function () {
                 slider.value = v;
                 app.state.otherHoldings[inv.id] = v;
                 updateSummary();
+                markSimulationStale();
             });
         });
     }
@@ -210,6 +249,9 @@ window.Portfolio = (function () {
         var overlay = app.el("stock-modal");
         overlay.addEventListener("click", function (e) {
             if (e.target === overlay) closeModal();
+        });
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && overlay.style.display !== "none") closeModal();
         });
     }
 
@@ -285,7 +327,19 @@ window.Portfolio = (function () {
         fill.style.width = Math.min(pct, 100) + "%";
         fill.classList.toggle("over-budget", totalSpent > data.BUDGET);
         app.el("budget-allocated").textContent = app.formatCurrency(totalSpent);
-        app.el("budget-remaining").textContent = app.formatCurrency(remaining) + " remaining";
+        var remainingEl = app.el("budget-remaining");
+        if (totalSpent > data.BUDGET) {
+            remainingEl.textContent = "Over budget by " + app.formatCurrency(totalSpent - data.BUDGET);
+            remainingEl.style.color = "var(--color-danger)";
+            remainingEl.style.fontWeight = "600";
+        } else {
+            remainingEl.textContent = app.formatCurrency(remaining) + " remaining";
+            remainingEl.style.color = "";
+            remainingEl.style.fontWeight = "";
+        }
+
+        // Persist state
+        app.saveState();
 
         // Holdings list
         updateHoldingsList();
@@ -595,6 +649,7 @@ window.Portfolio = (function () {
         renderStockGrid();
         renderOtherInvestments();
         updateSummary();
+        markSimulationStale();
     }
 
     function getTotal() {

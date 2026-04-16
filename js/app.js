@@ -7,8 +7,44 @@ window.App = (function () {
         /* Stock holdings: { AAPL: 3, MSFT: 1, ... } (share counts) */
         stockHoldings: {},
         /* Other investments: dollar amounts */
-        otherHoldings: { bonds: 0, etfs: 0, savings: 0 }
+        otherHoldings: { bonds: 0, etfs: 0, savings: 0 },
+        /* Simulation tracking */
+        simulationRun: false,
+        simulationStale: false
     };
+
+    var STORAGE_KEY = "learnInvestments_portfolio";
+
+    function saveState() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                stockHoldings: state.stockHoldings,
+                otherHoldings: state.otherHoldings
+            }));
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    function loadState() {
+        try {
+            var saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+            var parsed = JSON.parse(saved);
+            if (parsed.stockHoldings) state.stockHoldings = parsed.stockHoldings;
+            if (parsed.otherHoldings) {
+                state.otherHoldings.bonds = parsed.otherHoldings.bonds || 0;
+                state.otherHoldings.etfs = parsed.otherHoldings.etfs || 0;
+                state.otherHoldings.savings = parsed.otherHoldings.savings || 0;
+            }
+        } catch (e) { /* ignore corrupt data */ }
+    }
+
+    function resetState() {
+        state.stockHoldings = {};
+        state.otherHoldings = { bonds: 0, etfs: 0, savings: 0 };
+        state.simulationRun = false;
+        state.simulationStale = false;
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    }
 
     /* --- Utility functions --- */
     function formatCurrency(n) {
@@ -110,6 +146,7 @@ window.App = (function () {
 
     /* --- Initialization --- */
     function init() {
+        loadState();
         initTabs();
         initLearnTabs();
 
@@ -133,6 +170,8 @@ window.App = (function () {
         switchTab: switchTab,
         getTotalSpent: getTotalSpent,
         getRemaining: getRemaining,
-        getStockByTicker: getStockByTicker
+        getStockByTicker: getStockByTicker,
+        saveState: saveState,
+        resetState: resetState
     };
 })();

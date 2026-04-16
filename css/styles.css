@@ -1762,3 +1762,149 @@ a {
     color: var(--color-text-muted);
     border-top: 1px solid var(--color-border-light);
 }
+
+/* ===== Info Tooltips ===== */
+.info-icon {
+    display: inline-block;
+    position: relative;
+    cursor: help;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    margin-left: 0.25rem;
+    vertical-align: middle;
+}
+
+.info-icon .tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    width: 220px;
+    background: #333;
+    color: #fff;
+    font-size: var(--font-size-xs);
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    position: absolute;
+    z-index: 200;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    white-space: normal;
+}
+
+.info-icon:hover .tooltip-text,
+.info-icon:focus .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* ===== Toast Notification ===== */
+.toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: #333;
+    color: #fff;
+    padding: 0.6rem 1.25rem;
+    border-radius: 100px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 500;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast.toast-show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ===== Stale Simulation Banner ===== */
+.stale-banner {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    color: #795548;
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    margin-bottom: 1rem;
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* ===== Inline link-style button ===== */
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-family: var(--font-family);
+    font-size: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.btn-link:hover {
+    color: var(--color-primary-dark);
+}
+
+.reset-portfolio-btn {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.reset-portfolio-btn:hover {
+    color: var(--color-danger);
+}
+
+/* ===== Benchmark explanation ===== */
+.benchmark-explanation {
+    margin-top: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.benchmark-explanation summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-text);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.benchmark-explanation summary::before {
+    content: "▶";
+    font-size: 0.6rem;
+    transition: transform 0.2s ease;
+}
+
+.benchmark-explanation[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.benchmark-explanation p,
+.benchmark-explanation ul {
+    margin-top: 0.75rem;
+    line-height: 1.6;
+}
+
+.benchmark-explanation ul {
+    padding-left: 1.25rem;
+}
+
+.benchmark-explanation li {
+    margin-bottom: 0.25rem;
+}
