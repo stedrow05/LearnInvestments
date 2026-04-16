@@ -1763,6 +1763,222 @@ a {
     border-top: 1px solid var(--color-border-light);
 }
 
+/* ===== Impact Analysis Modal ===== */
+
+/* Overlay — sits above stock-detail modal (z-index 1100 vs 1000) */
+.impact-overlay {
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+}
+
+.impact-content {
+    max-width: 560px;
+    width: 94%;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border-radius: var(--radius-lg);
+}
+
+/* Header */
+.impact-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.impact-title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.impact-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.impact-sector-badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 100px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Body */
+.impact-body {
+    padding: 0 1.5rem;
+    flex: 1;
+}
+
+.impact-section {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.impact-section:last-child {
+    border-bottom: none;
+}
+
+.impact-section-label {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.impact-label-good { color: var(--color-success); }
+.impact-label-warn { color: #b45309; }
+
+.impact-summary {
+    font-size: var(--font-size-sm);
+    line-height: 1.65;
+    color: var(--color-text);
+}
+
+/* Metrics grid */
+.impact-metrics-head {
+    display: grid;
+    grid-template-columns: 1fr 4rem 1rem 4rem 4rem;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.col-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: right;
+}
+
+.impact-metric-row {
+    display: grid;
+    grid-template-columns: 1fr 4rem 1rem 4rem 4rem;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0.3rem 0;
+    border-top: 1px solid var(--color-border-light);
+    font-size: var(--font-size-sm);
+}
+
+.imp-label  { font-weight: 500; }
+.imp-before { text-align: right; color: var(--color-text-secondary); }
+.imp-arrow  { text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.imp-after  { text-align: right; font-weight: 600; }
+.imp-delta  { text-align: right; font-size: var(--font-size-xs); font-weight: 700; }
+
+.imp-warn-val { color: var(--color-warning); }
+
+.delta-up   { color: var(--color-success); }
+.delta-down { color: var(--color-danger); }
+.delta-flat { color: var(--color-text-muted); }
+.delta-warn { color: #b45309; }
+
+.impact-metrics-note {
+    margin-top: 0.5rem;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+/* Bullets */
+.impact-bullets {
+    padding-left: 1.25rem;
+    font-size: var(--font-size-sm);
+    line-height: 1;
+}
+
+.impact-bullets li {
+    margin-bottom: 0.45rem;
+    line-height: 1.55;
+}
+
+.impact-good li::marker { color: var(--color-success); }
+.impact-warn li::marker { color: #d97706; }
+
+/* Recommendation box */
+.impact-rec {
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
+    margin-top: 0.25rem;
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+}
+
+.impact-rec.impact-rec-proceed {
+    background: #f0fdf4;
+    border-left: 3px solid var(--color-success);
+}
+
+.impact-rec.impact-rec-caution {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+}
+
+.impact-rec.impact-rec-neutral {
+    background: var(--color-bg);
+    border-left: 3px solid var(--color-border);
+}
+
+.impact-rec .impact-section-label {
+    margin-bottom: 0.35rem;
+}
+
+/* Footer */
+.impact-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    position: sticky;
+    bottom: 0;
+}
+
+.impact-shares-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--font-size-sm);
+}
+
+.impact-shares-label {
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+
+.impact-shares-num {
+    min-width: 1.5rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: var(--font-size-base);
+}
+
+.impact-shares-cost {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.impact-footer-btns {
+    display: flex;
+    gap: 0.75rem;
+}
+
 /* ===== Info Tooltips ===== */
 .info-icon {
     display: inline-block;

@@ -148,15 +148,27 @@ window.Portfolio = (function () {
     }
 
     /* --- Buy / Sell shares --- */
-    function buyShare(ticker) {
+    function buyShare(ticker, onAfterBuy) {
         var stock = app.getStockByTicker(ticker);
         if (!stock || app.getRemaining() < stock.price) return;
 
-        app.state.stockHoldings[ticker] = (app.state.stockHoldings[ticker] || 0) + 1;
-        renderStockGrid();
-        updateSummary();
-        markSimulationStale();
-        showToast("Bought 1 share of " + ticker + " for " + app.formatCurrency(stock.price));
+        function executeBuy(shares) {
+            app.state.stockHoldings[ticker] = (app.state.stockHoldings[ticker] || 0) + shares;
+            renderStockGrid();
+            updateSummary();
+            markSimulationStale();
+            var shareWord = shares === 1 ? "share" : "shares";
+            showToast("Bought " + shares + " " + shareWord + " of " + ticker + " for " + app.formatCurrency(shares * stock.price));
+            if (onAfterBuy) onAfterBuy();
+        }
+
+        if (window.ImpactAnalyzer) {
+            ImpactAnalyzer.show(ticker, 1, function (confirmed, shares) {
+                if (confirmed && shares > 0) executeBuy(shares);
+            });
+        } else {
+            executeBuy(1);
+        }
     }
 
     function sellShare(ticker) {
@@ -303,8 +315,8 @@ window.Portfolio = (function () {
 
         app.el("modal-close-btn").addEventListener("click", closeModal);
         app.el("modal-buy").addEventListener("click", function () {
-            buyShare(ticker);
-            showStockModal(ticker); // refresh
+            // Pass a callback so the stock modal refreshes after the impact modal confirms
+            buyShare(ticker, function () { showStockModal(ticker); });
         });
         app.el("modal-sell").addEventListener("click", function () {
             sellShare(ticker);

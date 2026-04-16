@@ -151,6 +151,7 @@ window.App = (function () {
         initLearnTabs();
 
         if (window.ChartManager) ChartManager.init();
+        if (window.ImpactAnalyzer) ImpactAnalyzer.init();
         if (window.Portfolio) Portfolio.init();
         if (window.Simulation) Simulation.init();
         if (window.Quiz) Quiz.init();
